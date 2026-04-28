@@ -4,7 +4,7 @@
 
 const lazy = {};
 
-const FELT_REFRESH_TIMEOUT = 10000;
+const FELT_REFRESH_TIMEOUT = 60000;
 
 ChromeUtils.defineESModuleGetters(lazy, {
   TelemetryEnvironment: "resource://gre/modules/TelemetryEnvironment.sys.mjs",
