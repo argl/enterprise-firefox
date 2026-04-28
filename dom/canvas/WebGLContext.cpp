@@ -8,7 +8,6 @@
 #include <array>
 #include <bitset>
 #include <cctype>
-#include <queue>
 
 #include "AccessCheck.h"
 #include "CompositableHost.h"
@@ -2873,6 +2872,14 @@ webgl::ExplicitPixelPackingState::ForUseWith(
     state.imageHeight = subrectSize.y;
   }
 
+  if (!std::in_range<GLint>(state.rowLength) ||
+      !std::in_range<GLint>(state.imageHeight) ||
+      !std::in_range<GLint>(state.skipPixels) ||
+      !std::in_range<GLint>(state.skipRows) ||
+      !std::in_range<GLint>(state.skipImages)) {
+    return Err("pixelStorei params must be GLint.");
+  }
+
   // -
 
   const auto mpii = PackingInfoInfo::For(pi);
@@ -2967,7 +2974,9 @@ webgl::ExplicitPixelPackingState::ForUseWith(
 
   const auto elemsPerRowStride = ElemsPerRowStride();
   const auto bytesPerRowStride = pii.bytesPerElement * elemsPerRowStride;
-  if (!bytesPerRowStride.isValid()) {
+  const auto maxBytesPerRow = StaticPrefs::webgl_max_bytes_per_row();
+  if (!bytesPerRowStride.isValid() ||
+      (maxBytesPerRow > 0 && bytesPerRowStride.value() > maxBytesPerRow)) {
     return Err("ROW_LENGTH or width too large for packing.");
   }
   metrics.bytesPerRowStride = bytesPerRowStride.value();

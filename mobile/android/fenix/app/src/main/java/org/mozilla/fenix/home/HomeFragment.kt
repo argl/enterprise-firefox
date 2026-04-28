@@ -19,43 +19,36 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat.getColor
-import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mozilla.components.browser.state.state.TabSessionState
 import mozilla.components.browser.state.store.BrowserStore
+import mozilla.components.compose.base.snackbar.Snackbar
+import mozilla.components.compose.base.snackbar.displaySnackbar
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarState
 import mozilla.components.compose.browser.toolbar.store.BrowserToolbarStore
-import mozilla.components.compose.cfr.CFRPopup
-import mozilla.components.compose.cfr.CFRPopupProperties
 import mozilla.components.concept.engine.utils.ABOUT_HOME_URL
 import mozilla.components.concept.sync.AccountObserver
 import mozilla.components.concept.sync.AuthType
@@ -80,7 +73,6 @@ import org.mozilla.fenix.GleanMetrics.HomeScreen
 import org.mozilla.fenix.HomeActivity
 import org.mozilla.fenix.NavGraphDirections
 import org.mozilla.fenix.R
-import org.mozilla.fenix.addons.showSnackBar
 import org.mozilla.fenix.biometricauthentication.AuthenticationStatus
 import org.mozilla.fenix.biometricauthentication.BiometricAuthenticationManager
 import org.mozilla.fenix.browser.BrowserFragmentDirections
@@ -103,7 +95,7 @@ import org.mozilla.fenix.components.appstate.OrientationMode
 import org.mozilla.fenix.components.components
 import org.mozilla.fenix.components.metrics.installSourcePackage
 import org.mozilla.fenix.components.toolbar.BottomToolbarContainerView
-import org.mozilla.fenix.compose.snackbar.Snackbar
+import org.mozilla.fenix.components.toolbar.ToolbarPosition
 import org.mozilla.fenix.compose.snackbar.SnackbarState
 import org.mozilla.fenix.databinding.FragmentHomeBinding
 import org.mozilla.fenix.e2e.SystemInsetsPaddedFragment
@@ -117,7 +109,6 @@ import org.mozilla.fenix.ext.isToolbarAtBottom
 import org.mozilla.fenix.ext.nav
 import org.mozilla.fenix.ext.recordEventInNimbus
 import org.mozilla.fenix.ext.requireComponents
-import org.mozilla.fenix.ext.scaleToBottomOfView
 import org.mozilla.fenix.ext.settings
 import org.mozilla.fenix.ext.tabClosedUndoMessage
 import org.mozilla.fenix.ext.updateMicrosurveyPromptForConfigurationChange
@@ -138,6 +129,7 @@ import org.mozilla.fenix.home.sessioncontrol.DefaultSessionControlController
 import org.mozilla.fenix.home.sessioncontrol.SessionControlController
 import org.mozilla.fenix.home.sessioncontrol.SessionControlControllerCallback
 import org.mozilla.fenix.home.sessioncontrol.SessionControlInteractor
+import org.mozilla.fenix.home.sports.DefaultSportsController
 import org.mozilla.fenix.home.store.HomeToolbarStoreBuilder
 import org.mozilla.fenix.home.store.HomepageState
 import org.mozilla.fenix.home.termsofuse.DefaultPrivacyNoticeBannerController
@@ -151,7 +143,6 @@ import org.mozilla.fenix.home.topsites.TopSitesBinding
 import org.mozilla.fenix.home.topsites.controller.DefaultTopSiteController
 import org.mozilla.fenix.home.topsites.getTopSitesConfig
 import org.mozilla.fenix.home.ui.Homepage
-import org.mozilla.fenix.home.ui.MiddleSearchHomepage
 import org.mozilla.fenix.home.ui.WallpaperBackground
 import org.mozilla.fenix.messaging.DefaultMessageController
 import org.mozilla.fenix.messaging.FenixMessageSurfaceId
@@ -186,6 +177,7 @@ import org.mozilla.fenix.termsofuse.store.Surface
 import org.mozilla.fenix.theme.FirefoxTheme
 import org.mozilla.fenix.trackingprotection.TrackersBlockedFeature
 import org.mozilla.fenix.utils.allowUndo
+import org.mozilla.fenix.utils.getUndoDelay
 import org.mozilla.fenix.utils.showAddSearchWidgetPromptIfSupported
 import org.mozilla.fenix.wallpapers.Wallpaper
 import java.lang.ref.WeakReference
@@ -207,6 +199,8 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
     private val homeViewModel: HomeScreenViewModel by activityViewModels()
 
+    private val snackbarHostState = SnackbarHostState()
+
     @VisibleForTesting
     internal var homeNavigationBar: HomeNavigationBar? = null
 
@@ -220,16 +214,13 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
     private val collectionStorageObserver = object : TabCollectionStorage.Observer {
         @SuppressLint("NotifyDataSetChanged")
         override fun onTabsAdded(tabCollection: TabCollection, sessions: List<TabSessionState>) {
-            view?.let {
-                if (sessions.size == 1) {
-                    Snackbar.make(
-                        snackBarParentView = binding.dynamicSnackbarContainer,
-                        snackbarState = SnackbarState(
-                            message = it.context.getString(R.string.create_collection_tab_saved_2),
-                            duration = SnackbarState.Duration.Preset.Long,
-                        ),
-                    ).show()
-                }
+            if (sessions.size == 1) {
+                showComposeSnackbar(
+                    SnackbarState(
+                        message = requireContext().getString(R.string.create_collection_tab_saved_2),
+                        duration = SnackbarState.Duration.Preset.Long,
+                    ),
+                )
             }
         }
     }
@@ -259,9 +250,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
     private val toolbarView: FenixHomeToolbar
         get() = nullableToolbarView!!
-
-    private var lastAppliedWallpaperName: String = Wallpaper.DEFAULT
-    private var wallpaperUpdatesJob: Job? = null
 
     @VisibleForTesting
     internal val messagingFeatureHomescreen = ViewBoundFeatureWrapper<MessagingFeature>()
@@ -389,8 +377,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val activity = activity as HomeActivity
         val components = requireComponents
-
-        initWallpaper()
 
         lifecycleScope.launch(IO) {
             val settings = requireContext().settings()
@@ -521,23 +507,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         bundleArgs.getString(SESSION_TO_DELETE)?.let {
             homeViewModel.sessionToDelete = it
         }
-        tabsCleanupFeature.set(
-            feature = TabsCleanupFeature(
-                context = requireContext(),
-                viewModel = homeViewModel,
-                browserStore = components.core.store,
-                browsingModeManager = browsingModeManager,
-                navController = findNavController(),
-                tabsUseCases = components.useCases.tabsUseCases,
-                fenixBrowserUseCases = components.useCases.fenixBrowserUseCases,
-                settings = components.settings,
-                snackBarParentView = binding.dynamicSnackbarContainer,
-                viewLifecycleScope = viewLifecycleOwner.lifecycleScope,
-            ),
-            owner = viewLifecycleOwner,
-            view = binding.root,
-        )
-
         thumbnailsFeature.set(
             feature = HomepageThumbnailIntegration(
                 context = requireContext(),
@@ -547,21 +516,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
             ),
             owner = this,
             view = binding.homepageView,
-        )
-
-        snackbarBinding.set(
-            feature = SnackbarBinding(
-                context = requireContext(),
-                browserStore = requireContext().components.core.store,
-                appStore = requireContext().components.appStore,
-                snackbarDelegate = FenixSnackbarDelegate(binding.dynamicSnackbarContainer),
-                navController = findNavController(),
-                tabsUseCases = requireContext().components.useCases.tabsUseCases,
-                sendTabUseCases = SendTabUseCases(requireComponents.backgroundServices.accountManager),
-                customTabSessionId = null,
-            ),
-            owner = this,
-            view = binding.root,
         )
 
         privacyNoticeBannerStore = PrivacyNoticeBannerStore(
@@ -699,6 +653,10 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
                 longFoxFeature = components.core.longFoxFeature,
                 container = activity.getRootView() as? ViewGroup,
             ),
+            sportsController = DefaultSportsController(
+                appStore = components.appStore,
+                settings = components.settings,
+            ),
         )
 
         nullableToolbarView = buildToolbar(activity)
@@ -739,7 +697,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
         homeNavigationBar = HomeNavigationBar(
             context = activity,
-            container = binding.navigationBarContainer,
             toolbarStore = toolbarStore,
             settings = activity.settings(),
             hideWhenKeyboardShown = true,
@@ -791,42 +748,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
                 reinitializeMicrosurveyPrompt = { initializeMicrosurveyPrompt() },
             )
         }
-
-        initWallpaper(orientationChange = true)
-    }
-
-    private fun showEncourageSearchCfr() {
-        CFRPopup(
-            anchor = toolbarView.layout,
-            properties = CFRPopupProperties(
-                popupBodyColors = listOf(
-                    getColor(requireContext(), R.color.fx_mobile_layer_color_gradient_end),
-                    getColor(requireContext(), R.color.fx_mobile_layer_color_gradient_start),
-                ),
-                popupVerticalOffset = ENCOURAGE_SEARCH_CFR_VERTICAL_OFFSET.dp,
-                dismissButtonColor = getColor(requireContext(), R.color.fx_mobile_icon_color_oncolor),
-                indicatorDirection = if (requireContext().isToolbarAtBottom()) {
-                    CFRPopup.IndicatorDirection.DOWN
-                } else {
-                    CFRPopup.IndicatorDirection.UP
-                },
-            ),
-            onDismiss = {
-                with(requireComponents.settings) {
-                    lastCfrShownTimeInMillis = System.currentTimeMillis()
-                    shouldShowSearchBarCFR = false
-                }
-            },
-            text = {
-                FirefoxTheme {
-                    Text(
-                        text = FxNimbus.features.encourageSearchCfr.value().cfrText,
-                        color = FirefoxTheme.colors.textOnColorPrimary,
-                        style = FirefoxTheme.typography.body2,
-                    )
-                }
-            },
-        ).show()
     }
 
     @VisibleForTesting
@@ -1012,6 +933,42 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
             launcher = continuousOnboardingDefaultBrowserLauncher,
         )
 
+        tabsCleanupFeature.set(
+            feature = TabsCleanupFeature(
+                context = requireContext(),
+                viewModel = homeViewModel,
+                browserStore = requireComponents.core.store,
+                browsingModeManager = browsingModeManager,
+                navController = findNavController(),
+                tabsUseCases = requireComponents.useCases.tabsUseCases,
+                fenixBrowserUseCases = requireComponents.useCases.fenixBrowserUseCases,
+                settings = requireComponents.settings,
+                snackbarHostState = snackbarHostState,
+                viewLifecycleScope = viewLifecycleOwner.lifecycleScope,
+            ),
+            owner = viewLifecycleOwner,
+            view = view,
+        )
+
+        snackbarBinding.set(
+            feature = SnackbarBinding(
+                context = requireContext(),
+                browserStore = requireContext().components.core.store,
+                appStore = requireContext().components.appStore,
+                snackbarDelegate = FenixSnackbarDelegate(
+                    snackbarHostState = snackbarHostState,
+                    scope = viewLifecycleOwner.lifecycleScope,
+                    context = requireContext(),
+                ),
+                navController = findNavController(),
+                tabsUseCases = requireContext().components.useCases.tabsUseCases,
+                sendTabUseCases = SendTabUseCases(requireComponents.backgroundServices.accountManager),
+                customTabSessionId = null,
+            ),
+            owner = this,
+            view = view,
+        )
+
         // DO NOT MOVE ANYTHING BELOW THIS addMarker CALL!
         requireComponents.core.engine.profiler?.addMarker(
             MarkersFragmentLifecycleCallbacks.MARKER_NAME,
@@ -1020,6 +977,7 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         )
     }
 
+    @Suppress("LongMethod")
     private fun initComposeHomepage() {
         binding.homepageView.apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -1049,49 +1007,50 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
                     LaunchedEffect(isInPortrait, keyboardState) {
                         updateLayoutParams<ViewGroup.MarginLayoutParams> {
                             topMargin = getTopToolbarHeight()
-                            bottomMargin = getBottomToolbarHeight(keyboardState == KeyboardState.Closed)
+                            bottomMargin = getBottomToolbarHeight(
+                                includeNavBarIfEnabled = keyboardState == KeyboardState.Closed &&
+                                    settings.toolbarPosition == ToolbarPosition.BOTTOM,
+                            )
                         }
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (settings.shouldUseComposeWallpaper && !appState.value.mode.isPrivate) {
+                        if (!appState.value.mode.isPrivate) {
                             WallpaperBackground(
                                 wallpaper = appState.value.wallpaperState.currentWallpaper,
                                 loadBitmap = components.useCases.wallpaperUseCases.loadBitmap::invoke,
+                                onLoadFailed = {
+                                    requireContext().settings().currentWallpaperTextColor = 0L
+                                    showComposeSnackbar(
+                                        SnackbarState(
+                                            message = resources.getString(
+                                                R.string.wallpaper_select_error_snackbar_message,
+                                            ),
+                                        ),
+                                    )
+                                },
                             )
                         }
 
-                        if (settings.enableHomepageSearchBar) {
-                            MiddleSearchHomepage(
-                                state = HomepageState.build(
-                                    appState = appState.value,
-                                    privacyNoticeBannerState = privacyNoticeBannerState.value,
-                                    settings = settings,
-                                    browsingModeManager = browsingModeManager,
-                                ),
-                                interactor = sessionControlInteractor,
-                                onMiddleSearchBarVisibilityChanged = { isVisible ->
-                                    // Hide the main address bar in the toolbar when the middle search is
-                                    // visible (and vice versa)
-                                    toolbarView.updateAddressBarVisibility(!isVisible)
-                                },
-                                onTopSitesItemBound = {
-                                    StartupTimeline.onTopSitesItemBound(activity = (requireActivity() as HomeActivity))
-                                },
-                            )
-                        } else {
-                            Homepage(
-                                state = HomepageState.build(
-                                    appState = appState.value,
-                                    privacyNoticeBannerState = privacyNoticeBannerState.value,
-                                    settings = settings,
-                                    browsingModeManager = browsingModeManager,
-                                ),
-                                interactor = sessionControlInteractor,
-                                onTopSitesItemBound = {
-                                    StartupTimeline.onTopSitesItemBound(activity = (requireActivity() as HomeActivity))
-                                },
-                            )
+                        Homepage(
+                            state = HomepageState.build(
+                                appState = appState.value,
+                                privacyNoticeBannerState = privacyNoticeBannerState.value,
+                                settings = settings,
+                                browsingModeManager = browsingModeManager,
+                            ),
+                            interactor = sessionControlInteractor,
+                            onTopSitesItemBound = {
+                                StartupTimeline.onTopSitesItemBound(activity = (requireActivity() as HomeActivity))
+                            },
+                            navigationBarContent = homeNavigationBar?.asComposable(),
+                        )
+
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        ) { snackbarData ->
+                            Snackbar(snackbarData = snackbarData)
                         }
                     }
 
@@ -1169,17 +1128,30 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
     private fun showUndoSnackbar(message: String) {
         viewLifecycleOwner.lifecycleScope.allowUndo(
-            binding.dynamicSnackbarContainer,
-            message,
-            requireContext().getString(R.string.snackbar_deleted_undo),
-            {
+            snackbarHostState = snackbarHostState,
+            message = message,
+            undoActionTitle = requireContext().getString(R.string.snackbar_deleted_undo),
+            onCancel = {
                 requireComponents.useCases.tabsUseCases.undo.invoke()
                 findNavController().navigate(
                     HomeFragmentDirections.actionGlobalBrowser(null),
                 )
             },
-            operation = { },
+            operation = {},
+            undoDelay = requireContext().getUndoDelay(),
         )
+    }
+
+    private fun showComposeSnackbar(snackbarState: SnackbarState) {
+        val snackbarData = snackbarState.toSnackbarData()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            snackbarHostState.displaySnackbar(
+                visuals = snackbarData.visuals,
+                onActionPerformed = { snackbarData.performAction() },
+                onDismissPerformed = { snackbarState.onDismiss() },
+            )
+        }
     }
 
     override fun onDestroyView() {
@@ -1197,7 +1169,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         _binding = null
 
         bundleArgs.clear()
-        lastAppliedWallpaperName = Wallpaper.DEFAULT
     }
 
     override fun onStart() {
@@ -1222,14 +1193,13 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
                 object : AccountObserver {
                     override fun onAuthenticated(account: OAuthAccount, authType: AuthType) {
                         if (authType != AuthType.Existing) {
-                            view?.let {
-                                Snackbar.make(
-                                    snackBarParentView = binding.dynamicSnackbarContainer,
-                                    snackbarState = SnackbarState(
-                                        message = it.context.getString(R.string.onboarding_firefox_account_sync_is_on),
+                            showComposeSnackbar(
+                                SnackbarState(
+                                    message = requireContext().getString(
+                                        R.string.onboarding_firefox_account_sync_is_on,
                                     ),
-                                ).show()
-                            }
+                                ),
+                            )
                         }
                     }
                 },
@@ -1272,13 +1242,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
         evaluateMessagesForMicrosurvey(components)
 
-        maybeShowEncourageSearchCfr(
-            canShowCfr = components.settings.canShowCfr && components.settings.cfrPopupsEnabled,
-            shouldShowCFR = components.settings.shouldShowSearchBarCFR,
-            showCfr = ::showEncourageSearchCfr,
-            recordExposure = { FxNimbus.features.encourageSearchCfr.recordExposure() },
-        )
-
         BiometricAuthenticationManager.biometricAuthenticationNeededInfo.shouldShowAuthenticationPrompt =
             true
         BiometricAuthenticationManager.biometricAuthenticationNeededInfo.authenticationStatus =
@@ -1287,19 +1250,6 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
 
     private fun evaluateMessagesForMicrosurvey(components: Components) =
         components.appStore.dispatch(MessagingAction.Evaluate(FenixMessageSurfaceId.MICROSURVEY))
-
-    @VisibleForTesting
-    internal fun maybeShowEncourageSearchCfr(
-        canShowCfr: Boolean,
-        shouldShowCFR: Boolean,
-        showCfr: () -> Unit,
-        recordExposure: () -> Unit,
-    ) {
-        if (canShowCfr && shouldShowCFR) {
-            showCfr()
-            recordExposure()
-        }
-    }
 
     override fun onPause() {
         super.onPause()
@@ -1357,91 +1307,10 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         }
     }
 
-    @VisibleForTesting
-    internal fun shouldEnableWallpaper() =
-        (activity as? HomeActivity)?.themeManager?.currentTheme?.isPrivate?.not() ?: false
-
-    private fun initWallpaper(orientationChange: Boolean = false) {
-        if (requireContext().settings().shouldUseComposeWallpaper) {
-            binding.wallpaperImageView.isVisible = false
-        } else {
-            applyWallpaper(
-                wallpaperName = requireContext().settings().currentWallpaperName,
-                orientationChange = orientationChange,
-                orientation = requireContext().resources.configuration.orientation,
-            )
-        }
-    }
-
     internal fun isEdgeToEdgeBackgroundEnabled(): Boolean {
         val settings = requireContext().settings()
         return settings.enableHomepageEdgeToEdgeBackgroundFeature &&
                 settings.currentWallpaperName == Wallpaper.EDGE_TO_EDGE
-    }
-
-    private fun applyWallpaper(wallpaperName: String, orientationChange: Boolean, orientation: Int) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            when {
-                !shouldEnableWallpaper() || (wallpaperName == lastAppliedWallpaperName && !orientationChange) -> {
-                    // no-op
-                }
-
-                Wallpaper.isLocalWallpaper(wallpaperName) -> {
-                    binding.wallpaperImageView.isVisible = false
-                    lastAppliedWallpaperName = wallpaperName
-                }
-
-                else -> {
-                    // loadBitmap does file lookups based on name, so we don't need a fully
-                    // qualified type to load the image
-                    val wallpaper = Wallpaper.Default.copy(name = wallpaperName)
-                    val wallpaperImage = requireComponents.useCases.wallpaperUseCases.loadBitmap(wallpaper, orientation)
-                    wallpaperImage?.let {
-                        it.scaleToBottomOfView(binding.wallpaperImageView)
-                        binding.wallpaperImageView.isVisible = true
-                        lastAppliedWallpaperName = wallpaperName
-                    } ?: run {
-                        if (!isActive) return@launch
-                        with(binding.wallpaperImageView) {
-                            isVisible = false
-                            showSnackBar(
-                                view = binding.dynamicSnackbarContainer,
-                                text = resources.getString(R.string.wallpaper_select_error_snackbar_message),
-                            )
-                        }
-                        // If setting a wallpaper failed reset also the contrasting text color.
-                        requireContext().settings().currentWallpaperTextColor = 0L
-                        lastAppliedWallpaperName = Wallpaper.DEFAULT
-                    }
-                }
-            }
-
-            observeWallpaperUpdates()
-        }
-    }
-
-    private fun observeWallpaperUpdates() {
-        if (!shouldEnableWallpaper() || wallpaperUpdatesJob?.isActive == true) return
-
-        wallpaperUpdatesJob = viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.CREATED) {
-                requireComponents.appStore.stateFlow
-                    .filter { it.mode == BrowsingMode.Normal }
-                    .map { it.wallpaperState.currentWallpaper }
-                    .distinctUntilChanged()
-                    .collect {
-                        if (it.name != lastAppliedWallpaperName) {
-                            applyWallpaper(
-                                wallpaperName = it.name,
-                                orientationChange = false,
-                                orientation = requireContext().resources.configuration.orientation,
-                            )
-                        }
-                    }
-            }
-        }.also { job ->
-            job.invokeOnCompletion { wallpaperUpdatesJob = null }
-        }
     }
 
     private fun initializeAwesomeBarComposable(
@@ -1459,6 +1328,7 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
             navController = findNavController(),
             tabId = args.sessionToStartSearchFor,
             searchAccessPoint = args.searchAccessPoint,
+            isEdgeToEdgeBackgroundEnabled = isEdgeToEdgeBackgroundEnabled(),
         ).also {
             awesomeBarComposable = it
         }
@@ -1469,7 +1339,5 @@ class HomeFragment : Fragment(), SystemInsetsPaddedFragment {
         const val FOCUS_ON_ADDRESS_BAR = "focusOnAddressBar"
         const val START_VOICE_SEARCH = "startVoiceSearch"
         private const val SESSION_TO_DELETE = "sessionToDelete"
-
-        private const val ENCOURAGE_SEARCH_CFR_VERTICAL_OFFSET = 0
     }
 }

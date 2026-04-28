@@ -11,6 +11,7 @@ add_task(async function () {
       ["layout.css.relative-color-syntax.enabled", true],
       ["layout.css.color-mix-multi-color.enabled", true],
       ["dom.security.html_serialization_escape_lt_gt", true],
+      ["layout.css.attr.enabled", true],
     ],
   });
   await addTab("about:blank");
@@ -580,6 +581,7 @@ function testParseShape(doc, parser) {
       desc: "Invalid polygon shape",
       definition: "polygon(0px 0px 100px 20px, 20% 20%)",
       spanCount: 0,
+      hasShapeWatch: false,
     },
     {
       desc: "Circle shape with all arguments",
@@ -620,6 +622,7 @@ function testParseShape(doc, parser) {
       desc: "Invalid circle shape",
       definition: "circle(25%at30%30%)",
       spanCount: 0,
+      hasShapeWatch: false,
     },
     {
       desc: "Ellipse shape with all arguments",
@@ -655,6 +658,7 @@ function testParseShape(doc, parser) {
       desc: "Invalid ellipse shape",
       definition: "ellipse(200px100px at 30$ 20%)",
       spanCount: 0,
+      hasShapeWatch: false,
     },
     {
       desc: "Inset shape with 4 arguments",
@@ -680,6 +684,7 @@ function testParseShape(doc, parser) {
       desc: "Inset shape with 0 arguments",
       definition: "inset()",
       spanCount: 0,
+      hasShapeWatch: false,
     },
     {
       desc: "INSET()",
@@ -694,14 +699,35 @@ function testParseShape(doc, parser) {
     },
   ];
 
-  for (const { desc, definition, property = "clip-path", spanCount } of tests) {
+  for (const {
+    desc,
+    definition,
+    property = "clip-path",
+    spanCount,
+    hasShapeWatch = true,
+  } of tests) {
     info(desc);
     const frag = parser.parseCssProperty(property, definition, {
       shapeClass: "inspector-shape",
+      shapeSwatchClass: "inspector-shape-swatch",
     });
     const spans = frag.querySelectorAll(".inspector-shape-point");
     is(spans.length, spanCount, desc + " span count");
     is(frag.textContent, definition, desc + " text content");
+    is(
+      frag.querySelectorAll("button.inspector-shape-swatch").length,
+      hasShapeWatch ? 1 : 0,
+      `${desc} ${hasShapeWatch ? "has" : "does not have"} a swatch button when shapeSwatchClass option is passed`
+    );
+
+    const swatchlessFrag = parser.parseCssProperty(property, definition, {
+      shapeClass: "inspector-shape",
+    });
+    is(
+      swatchlessFrag.querySelector("button"),
+      null,
+      `${desc} does not have a swatch button when shapeSwatchClass option is not passed`
+    );
   }
 }
 
@@ -1854,27 +1880,55 @@ function testParseAttr(doc, parser) {
         "Passing known attribute doesn't add unmatched classes to attribute name",
       propertyValue: "attr(data-x)",
       attributes: { "data-x": "" },
-      expected: `attr(<span class="inspector-attribute" data-attribute="&quot;&quot;">data-x</span>)`,
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;&quot;">data-x</span>` +
+        `</span>` +
+        `)`,
     },
     {
       message:
         "Passing unknown attribute adds unmatched classes to attribute name",
       propertyValue: "attr(data-x)",
       attributes: {},
-      expected: `attr(<span class="inspector-attribute unmatched-class" data-attribute="Attribute data-x is not set">data-x</span>)`,
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+        `</span>` +
+        `)`,
     },
     {
       message:
         "Passing unknown attribute adds unmatched classes to attribute name, not to fallback",
       propertyValue: `attr(data-x, "fallback")`,
       attributes: {},
-      expected: `attr(<span class="inspector-attribute unmatched-class" data-attribute="Attribute data-x is not set">data-x</span>, <span class="inspector-attr-fallback">"fallback"</span>)`,
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback">"fallback"</span>` +
+        `)`,
     },
     {
       message: "Passing known attribute adds unmatched classes to fallback",
       propertyValue: `attr(data-x, "fallback")`,
       attributes: { "data-x": "" },
-      expected: `attr(<span class="inspector-attribute" data-attribute="&quot;&quot;">data-x</span>, <span class="inspector-attr-fallback unmatched-class">"fallback"</span>)`,
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;&quot;">data-x</span>` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+        `)`,
     },
     {
       message: "Checking attr() + spaces",
@@ -1883,9 +1937,223 @@ function testParseAttr(doc, parser) {
       // prettier-ignore
       expected:
         `attr(` +
-          `<span class="inspector-attribute" data-attribute="&quot;&quot;">data-x</span>` +
+          `  ` +
+          `<span class="inspector-attr-param">` +
+            `<span class="inspector-attr-name" data-attribute="&quot;&quot;">data-x</span>` +
+          `</span>` +
+          `  ,  ` +
+          `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+        `  )`,
+    },
+    {
+      message: "Modern attr() with known attribute and simple type",
+      propertyValue: "attr(data-x raw-string)",
+      attributes: { "data-x": "x" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message: "Modern attr() with known attribute and type()",
+      propertyValue: "attr(data-x type(<length> | <percentage>))",
+      attributes: { "data-x": "x" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message: "Modern attr() with unknown attribute and simple type",
+      propertyValue: "attr(data-x raw-string)",
+      attributes: {},
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message: "Modern attr() with unknown attribute and type()",
+      propertyValue: "attr(data-x type(<length> | <percentage>))",
+      attributes: {},
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with known attribute, simple type and simple fallback",
+      propertyValue: `attr(data-x raw-string, "fallback")`,
+      attributes: { "data-x": "x" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+        `)`,
+    },
+    {
+      message: "Modern attr() with known attribute, type() and simple fallback",
+      propertyValue: `attr(data-x type(<length> | <percentage>), "fallback")`,
+      attributes: { "data-x": "x" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with unknown attribute, simple type and simple fallback",
+      propertyValue: `attr(data-x raw-string, "fallback")`,
+      attributes: {},
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback">"fallback"</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with unknown attribute, type() and simple fallback",
+      propertyValue: `attr(data-x type(<length> | <percentage>), "fallback")`,
+      attributes: {},
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback">"fallback"</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with known attribute, simple type and nested attr() fallback",
+      propertyValue: `attr(data-x raw-string, attr(data-y, "fallback"))`,
+      attributes: { "data-x": "x", "data-y": "y" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback unmatched-class">` +
+          `attr(` +
+          `<span class="inspector-attr-param">` +
+            `<span class="inspector-attr-name" data-attribute="&quot;y&quot;">data-y</span>` +
+          `</span>` +
           `, ` +
           `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+          `)` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with known attribute, type() and nested attr() fallback",
+      propertyValue: `attr(data-x type(<length> | <percentage>), attr(data-y, "fallback"))`,
+      attributes: { "data-x": "x" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param">` +
+          `<span class="inspector-attr-name" data-attribute="&quot;x&quot;">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback unmatched-class">` +
+          `attr(` +
+          `<span class="inspector-attr-param unmatched-class">` +
+            `<span class="inspector-attr-name" data-attribute="Attribute data-y is not set">data-y</span>` +
+          `</span>` +
+          `, ` +
+          `<span class="inspector-attr-fallback">"fallback"</span>` +
+          `)` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with unknown attribute, simple type and nested attr() fallback",
+      propertyValue: `attr(data-x raw-string, attr(data-y, "fallback"))`,
+      attributes: { "data-y": "y" },
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` raw-string` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback">` +
+          `attr(` +
+          `<span class="inspector-attr-param">` +
+            `<span class="inspector-attr-name" data-attribute="&quot;y&quot;">data-y</span>` +
+          `</span>` +
+          `, ` +
+          `<span class="inspector-attr-fallback unmatched-class">"fallback"</span>` +
+          `)` +
+        `</span>` +
+        `)`,
+    },
+    {
+      message:
+        "Modern attr() with unknown attribute, type() and nested attr() fallback",
+      propertyValue: `attr(data-x type(<length> | <percentage>), attr(data-y, "fallback"))`,
+      attributes: {},
+      // prettier-ignore
+      expected:
+        `attr(` +
+        `<span class="inspector-attr-param unmatched-class">` +
+          `<span class="inspector-attr-name" data-attribute="Attribute data-x is not set">data-x</span>` +
+          ` type(&lt;length&gt; | &lt;percentage&gt;)` +
+        `</span>` +
+        `, ` +
+        `<span class="inspector-attr-fallback">` +
+          `attr(` +
+          `<span class="inspector-attr-param unmatched-class">` +
+            `<span class="inspector-attr-name" data-attribute="Attribute data-y is not set">data-y</span>` +
+          `</span>` +
+          `, ` +
+          `<span class="inspector-attr-fallback">"fallback"</span>` +
+          `)` +
+        `</span>` +
         `)`,
     },
   ];

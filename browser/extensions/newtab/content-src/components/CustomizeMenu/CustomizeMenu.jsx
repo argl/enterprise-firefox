@@ -86,21 +86,39 @@ export class _CustomizeMenu extends React.PureComponent {
           in={!this.props.showing}
           appear={true}
         >
-          <button
-            ref={this.personalizeButtonRef}
-            className={`${activationWindowClass} personalize-button`}
-            data-l10n-id="newtab-customize-panel-icon-button"
-            aria-haspopup="dialog"
-            onClick={() => this.props.onOpen()}
-          >
-            <label data-l10n-id="newtab-customize-panel-icon-button-label" />
-            <div>
-              <img
-                role="presentation"
-                src="chrome://global/skin/icons/edit-outline.svg"
-              />
-            </div>
-          </button>
+          {
+            // @nova-cleanup(remove-conditional): replace with moz-button only
+            novaEnabled ? (
+              <moz-button
+                ref={this.personalizeButtonRef}
+                className={`open-customization-button${activationWindowClass ? ` ${activationWindowClass}` : ""}`}
+                data-l10n-id="newtab-customize-panel-label"
+                aria-haspopup="dialog"
+                aria-expanded={this.props.showing ? "true" : "false"}
+                onClick={() => this.props.onOpen()}
+                iconsrc="chrome://global/skin/icons/edit-outline.svg"
+                iconposition="end"
+                type="default"
+              ></moz-button>
+            ) : (
+              <button
+                ref={this.personalizeButtonRef}
+                className={`${activationWindowClass} personalize-button`}
+                data-l10n-id="newtab-customize-panel-icon-button"
+                aria-haspopup="dialog"
+                aria-expanded={this.props.showing}
+                onClick={() => this.props.onOpen()}
+              >
+                <label data-l10n-id="newtab-customize-panel-icon-button-label" />
+                <div>
+                  <img
+                    role="presentation"
+                    src="chrome://global/skin/icons/edit-outline.svg"
+                  />
+                </div>
+              </button>
+            )
+          }
         </CSSTransition>
         <CSSTransition
           nodeRef={this.dialogRef}
@@ -138,6 +156,7 @@ export class _CustomizeMenu extends React.PureComponent {
                 enabledSections={this.props.enabledSections}
                 enabledWidgets={this.props.enabledWidgets}
                 wallpapersEnabled={this.props.wallpapersEnabled}
+                wallpapersUserEnabled={this.props.wallpapersUserEnabled}
                 activeWallpaper={this.props.activeWallpaper}
                 pocketRegion={this.props.pocketRegion}
                 mayHaveTopicSections={this.props.mayHaveTopicSections}

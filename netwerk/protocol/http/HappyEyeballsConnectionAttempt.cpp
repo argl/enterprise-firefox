@@ -8,6 +8,7 @@
 #include "HappyEyeballsConnectionAttempt.h"
 #include "ConnectionEntry.h"
 #include "mozilla/net/NeckoChannelParams.h"
+#include "mozilla/StaticPrefs_network.h"
 #include "nsIHttpActivityObserver.h"
 #include "PendingTransactionInfo.h"
 #include "nsHttpTransaction.h"
@@ -78,7 +79,9 @@ nsresult HappyEyeballsConnectionAttempt::CreateHappyEyeballs(
     ConnectionEntry* ent) {
   happy_eyeballs::IpPreference ipPref =
       happy_eyeballs::IpPreference::DualStackPreferV6;
-  if (ent->PreferenceKnown() && ent->mPreferIPv4) {
+  if (mConnInfo->GetIPv6Disabled()) {
+    ipPref = happy_eyeballs::IpPreference::Ipv4Only;
+  } else if (ent->PreferenceKnown() && ent->mPreferIPv4) {
     ipPref = happy_eyeballs::IpPreference::DualStackPreferV4;
   }
 
@@ -980,9 +983,10 @@ void HappyEyeballsConnectionAttempt::OnSucceeded() {
 
   RefPtr<nsHttpConnection> connTCP = do_QueryObject(mOutputConn);
   if (connTCP) {
-    // If the original request had H3 alt-svc but a TCP connection won,
-    // remove the Alt-Used header since we're not using the alt-svc route.
-    if (mConnInfo->IsHttp3()) {
+    // If the original request had an alt-svc route but a direct TCP
+    // connection won, remove the Alt-Used header since we're not using
+    // the alt-svc route.
+    if (!mConnInfo->GetRoutedHost().IsEmpty()) {
       if (nsHttpTransaction* trans = mTransaction->QueryHttpTransaction()) {
         trans->RemoveAltSvcUsedHeader();
       }

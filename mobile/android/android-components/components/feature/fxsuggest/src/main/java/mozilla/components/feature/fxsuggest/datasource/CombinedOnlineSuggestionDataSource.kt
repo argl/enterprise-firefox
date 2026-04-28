@@ -6,8 +6,19 @@ package mozilla.components.feature.fxsuggest.datasource
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import mozilla.components.concept.awesomebar.AwesomeBar
+import mozilla.components.concept.awesomebar.AwesomeBar.CombinedSuggestionsDataSource
+import mozilla.components.feature.fxsuggest.client.MerinoClient
+import mozilla.components.feature.fxsuggest.client.SuggestMerinoClient
+import mozilla.components.feature.fxsuggest.dto.CombinedSuggestionResponseDto
+import mozilla.components.feature.fxsuggest.dto.SuggestionDto
+import mozilla.components.feature.fxsuggest.parser.FlightsSuggestionParser
+import mozilla.components.feature.fxsuggest.parser.SportsSuggestionParser
+import mozilla.components.feature.fxsuggest.parser.StocksSuggestionParser
 
 /**
  * Minimum length of the query that will trigger network request for fetching online suggestions.
@@ -56,21 +67,33 @@ sealed class CombinedResults {
  *
  * @param scope A long-lived [CoroutineScope] (e.g. application scope) used to launch network
  * requests independently of any individual provider's lifecycle.
+ * @param client The [MerinoClient] used to perform the network request.
  */
 class CombinedOnlineSuggestionDataSource(
     private val scope: CoroutineScope,
-) {
+    private val client: MerinoClient = SuggestMerinoClient(),
+) : CombinedSuggestionsDataSource {
     @Volatile
     private var pendingRequest: Pair<String, Deferred<CombinedResults>>? = null
 
-    /**
-     * Returns suggestions for [query], making at most one network request even when called
-     * concurrently by multiple providers for the same query.
-     */
-    suspend fun fetch(query: String): CombinedResults {
+    private val json = Json { ignoreUnknownKeys = true }
+    private val stocksParser = StocksSuggestionParser()
+    private val sportsParser = SportsSuggestionParser()
+    private val flightsParser = FlightsSuggestionParser()
+
+    private suspend fun fetch(query: String): CombinedResults {
         if (query.length < MIN_QUERY_LENGTH) return CombinedResults.Empty
         return getOrCreateRequest(query).await()
     }
+
+    override suspend fun fetchStocks(query: String): List<AwesomeBar.StockItem> =
+        (fetch(query) as? CombinedResults.Stocks)?.items ?: emptyList()
+
+    override suspend fun fetchSports(query: String): List<AwesomeBar.SportItem> =
+        (fetch(query) as? CombinedResults.Sports)?.items ?: emptyList()
+
+    override suspend fun fetchFlights(query: String): List<AwesomeBar.FlightItem> =
+        (fetch(query) as? CombinedResults.Flights)?.items ?: emptyList()
 
     @Synchronized
     private fun getOrCreateRequest(query: String): Deferred<CombinedResults> {
@@ -82,18 +105,35 @@ class CombinedOnlineSuggestionDataSource(
         }
     }
 
-    private fun fetchAndParse(query: String): CombinedResults {
-        val body = makeRequest(query) ?: return CombinedResults.Empty
-        return parseResponse(body)
-    }
-
-    private fun makeRequest(query: String): String? {
-        println(query)
-        TODO()
+    private suspend fun fetchAndParse(query: String): CombinedResults = withContext(Dispatchers.IO) {
+        val body = client.makeRequest(query) ?: return@withContext CombinedResults.Empty
+        parseResponse(body)
     }
 
     private fun parseResponse(body: String): CombinedResults {
-        println(body)
-        TODO()
+        return try {
+            val response = json.decodeFromString<CombinedSuggestionResponseDto>(body)
+            val winner = response.suggestions.maxByOrNull { it.score } ?: return CombinedResults.Empty
+            toResults(winner)
+        } catch (_: Exception) {
+            CombinedResults.Empty
+        }
+    }
+
+    private fun toResults(suggestion: SuggestionDto): CombinedResults {
+        val details = suggestion.customDetails ?: return CombinedResults.Empty
+
+        return when (suggestion.provider) {
+            StocksSuggestionParser.PROVIDER_NAME -> details.polygon?.let {
+                CombinedResults.Stocks(stocksParser.parse(it))
+            }
+            SportsSuggestionParser.PROVIDER_NAME -> details.sports?.let {
+                CombinedResults.Sports(sportsParser.parse(it))
+            }
+            FlightsSuggestionParser.PROVIDER_NAME -> details.flightaware?.let {
+                CombinedResults.Flights(flightsParser.parse(it))
+            }
+            else -> null
+        } ?: CombinedResults.Empty
     }
 }

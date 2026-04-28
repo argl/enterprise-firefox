@@ -5,7 +5,7 @@
 use api::{AlphaType, ClipMode, ImageBufferKind};
 use api::{FontInstanceFlags, YuvColorSpace, YuvFormat, ColorDepth, ColorRange, PremultipliedColorF};
 use api::units::*;
-use crate::clip::{ClipNodeFlags, ClipNodeRange, ClipItemKind, ClipStore};
+use crate::clip::{clamped_radius, ClipNodeFlags, ClipNodeRange, ClipItemKind, ClipStore};
 use crate::command_buffer::PrimitiveCommand;
 use crate::composite::CompositorSurfaceKind;
 use crate::pattern::PatternKind;
@@ -15,8 +15,8 @@ use crate::gpu_types::{BrushFlags, BrushInstance, ImageSource, PrimitiveHeaders,
 use crate::gpu_types::SplitCompositeInstance;
 use crate::gpu_types::{PrimitiveInstanceData, RasterizationSpace, GlyphInstance};
 use crate::gpu_types::{PrimitiveHeader, PrimitiveHeaderIndex};
-use crate::gpu_types::{ImageBrushUserData, get_shader_opacity, BoxShadowData, MaskInstance};
-use crate::gpu_types::{ClipMaskInstanceCommon, ClipMaskInstanceRect, ClipMaskInstanceBoxShadow};
+use crate::gpu_types::{ImageBrushUserData, get_shader_opacity, MaskInstance};
+use crate::gpu_types::{ClipMaskInstanceCommon, ClipMaskInstanceRect};
 use crate::internal_types::{FastHashMap, Filter, FrameAllocator, FrameMemory, FrameVec, Swizzle, TextureSource};
 use crate::picture::{Picture3DContext, PictureCompositeMode, calculate_screen_uv};
 use crate::prim_store::{PrimitiveInstanceKind, ClipData};
@@ -1686,9 +1686,9 @@ impl BatchBuilder {
             PrimitiveInstanceKind::BoxShadow { .. } => {
                 unreachable!("BUG: Should not hit box-shadow here as they are handled by quad infra");
             }
-            PrimitiveInstanceKind::NormalBorder { data_handle, ref render_task_ids, .. } => {
+            PrimitiveInstanceKind::NormalBorder { data_handle, scratch_handle, .. } => {
                 let prim_data = &ctx.data_stores.normal_border[data_handle];
-                let task_ids = &ctx.scratch.border_cache_handles[*render_task_ids];
+                let task_ids = &ctx.scratch.border_task_ids[ctx.scratch.normal_border[scratch_handle].task_ids];
                 let mut segment_data: SmallVec<[SegmentInstanceData; 8]> = SmallVec::new();
 
                 // Collect the segment instance data from each render
@@ -1968,39 +1968,38 @@ impl BatchBuilder {
                     },
                 );
             }
-            PrimitiveInstanceKind::LineDecoration { ref render_task, .. } => {
+            PrimitiveInstanceKind::LineDecoration { scratch_handle, .. } => {
+                let render_task_id = ctx.scratch.line_decoration[scratch_handle].task_id;
+
                 let (clip_task_address, clip_mask_texture_id) = ctx.get_prim_clip_task_and_texture(
                     prim_info.clip_task_index,
                     render_tasks,
                 ).unwrap();
 
-                let (batch_kind, textures, prim_user_data, specific_resource_address) = match render_task {
-                    Some(task_id) => {
-                        let (uv_rect_address, texture) = render_tasks.resolve_location(*task_id).unwrap();
-                        let textures = BatchTextures::prim_textured(
-                            texture,
-                            clip_mask_texture_id,
-                        );
-                        (
-                            BrushBatchKind::Image(texture.image_buffer_kind()),
-                            textures,
-                            ImageBrushUserData {
-                                color_mode: ShaderColorMode::Image,
-                                alpha_type: AlphaType::PremultipliedAlpha,
-                                raster_space: RasterizationSpace::Local,
-                                opacity: 1.0,
-                            }.encode(),
-                            uv_rect_address.as_int(),
-                        )
-                    }
-                    None => {
-                        (
-                            BrushBatchKind::Solid,
-                            BatchTextures::prim_untextured(clip_mask_texture_id),
-                            [get_shader_opacity(1.0), 0, 0, 0],
-                            0,
-                        )
-                    }
+                let (batch_kind, textures, prim_user_data, specific_resource_address) = if render_task_id != RenderTaskId::INVALID {
+                    let (uv_rect_address, texture) = render_tasks.resolve_location(render_task_id).unwrap();
+                    let textures = BatchTextures::prim_textured(
+                        texture,
+                        clip_mask_texture_id,
+                    );
+                    (
+                        BrushBatchKind::Image(texture.image_buffer_kind()),
+                        textures,
+                        ImageBrushUserData {
+                            color_mode: ShaderColorMode::Image,
+                            alpha_type: AlphaType::PremultipliedAlpha,
+                            raster_space: RasterizationSpace::Local,
+                            opacity: 1.0,
+                        }.encode(),
+                        uv_rect_address.as_int(),
+                    )
+                } else {
+                    (
+                        BrushBatchKind::Solid,
+                        BatchTextures::prim_untextured(clip_mask_texture_id),
+                        [get_shader_opacity(1.0), 0, 0, 0],
+                        0,
+                    )
                 };
 
                 let prim_header = PrimitiveHeader {
@@ -2782,7 +2781,6 @@ pub struct ClipBatchList {
     /// Rectangle draws fill up the rectangles with rounded corners.
     pub slow_rectangles: FrameVec<ClipMaskInstanceRect>,
     pub fast_rectangles: FrameVec<ClipMaskInstanceRect>,
-    pub box_shadows: FastHashMap<TextureSource, FrameVec<ClipMaskInstanceBoxShadow>>,
 }
 
 impl ClipBatchList {
@@ -2790,14 +2788,12 @@ impl ClipBatchList {
         ClipBatchList {
             slow_rectangles: memory.new_vec(),
             fast_rectangles: memory.new_vec(),
-            box_shadows: FastHashMap::default(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         self.slow_rectangles.is_empty()
           && self.fast_rectangles.is_empty()
-          && self.box_shadows.is_empty()
     }
 }
 
@@ -2960,7 +2956,6 @@ impl ClipBatcher {
         &mut self,
         clip_node_range: ClipNodeRange,
         root_spatial_node_index: SpatialNodeIndex,
-        render_tasks: &RenderTaskGraph,
         clip_store: &ClipStore,
         transforms: &mut TransformPalette,
         actual_rect: DeviceRect,
@@ -3001,51 +2996,24 @@ impl ClipBatcher {
                 ClipItemKind::Image { .. } => {
                     unreachable!();
                 }
-                ClipItemKind::BoxShadow { ref source }  => {
-                    // Only reachable when use_quad_box_shadow is not set.
-                    let task_id = source
-                        .render_task
-                        .expect("bug: render task handle not allocated");
-                    let (uv_rect_address, texture) = render_tasks.resolve_location(task_id).unwrap();
-
-                    self.get_batch_list(is_first_clip)
-                        .box_shadows
-                        .entry(texture)
-                        .or_insert_with(|| ctx.frame_memory.new_vec())
-                        .push(ClipMaskInstanceBoxShadow {
-                            common,
-                            resource_address: uv_rect_address.as_int(),
-                            shadow_data: BoxShadowData {
-                                src_rect_size: source.original_alloc_size,
-                                clip_mode: source.clip_mode as i32,
-                                stretch_mode_x: source.stretch_mode_x as i32,
-                                stretch_mode_y: source.stretch_mode_y as i32,
-                                dest_rect: source.prim_shadow_rect,
-                            },
-                        });
-
-                    true
-                }
-                ClipItemKind::Rectangle { size, mode: ClipMode::ClipOut } => {
-                    let rect = LayoutRect::from_origin_and_size(clip_instance.clip_rect_origin, size);
+                ClipItemKind::Rectangle { mode: ClipMode::ClipOut } => {
                     self.get_batch_list(is_first_clip)
                         .slow_rectangles
                         .push(ClipMaskInstanceRect {
                             common,
-                            local_pos: rect.min,
-                            clip_data: ClipData::uniform(rect.size(), 0.0, ClipMode::ClipOut),
+                            local_pos: clip_instance.clip_rect.min,
+                            clip_data: ClipData::uniform(clip_instance.clip_rect.size(), 0.0, ClipMode::ClipOut),
                         });
 
                     true
                 }
-                ClipItemKind::Rectangle { size, mode: ClipMode::Clip } => {
-                    let rect = LayoutRect::from_origin_and_size(clip_instance.clip_rect_origin, size);
+                ClipItemKind::Rectangle { mode: ClipMode::Clip } => {
                     if clip_instance.flags.contains(ClipNodeFlags::SAME_COORD_SYSTEM) {
                         false
                     } else {
                         if self.add_tiled_clip_mask(
                             actual_rect,
-                            rect,
+                            clip_instance.clip_rect,
                             clip_instance.spatial_node_index,
                             ctx.spatial_tree,
                             &ctx.screen_world_rect,
@@ -3059,21 +3027,22 @@ impl ClipBatcher {
                                 .slow_rectangles
                                 .push(ClipMaskInstanceRect {
                                     common,
-                                    local_pos: rect.min,
-                                    clip_data: ClipData::uniform(rect.size(), 0.0, ClipMode::Clip),
+                                    local_pos: clip_instance.clip_rect.min,
+                                    clip_data: ClipData::uniform(clip_instance.clip_rect.size(), 0.0, ClipMode::Clip),
                                 });
                         }
 
                         true
                     }
                 }
-                ClipItemKind::RoundedRectangle { size, ref radius, mode, .. } => {
-                    let rect = LayoutRect::from_origin_and_size(clip_instance.clip_rect_origin, size);
+                ClipItemKind::RoundedRectangle { ref radius, mode, .. } => {
+                    let size = clip_instance.clip_rect.size();
+                    let radius = clamped_radius(radius, size);
                     let batch_list = self.get_batch_list(is_first_clip);
                     let instance = ClipMaskInstanceRect {
                         common,
-                        local_pos: rect.min,
-                        clip_data: ClipData::rounded_rect(rect.size(), radius, mode),
+                        local_pos: clip_instance.clip_rect.min,
+                        clip_data: ClipData::rounded_rect(size, &radius, mode),
                     };
                     if clip_instance.flags.contains(ClipNodeFlags::USE_FAST_PATH) {
                         batch_list.fast_rectangles.push(instance);

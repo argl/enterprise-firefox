@@ -241,8 +241,7 @@ module.exports = function (config) {
                 branches: 0,
               },
             /**
-             * SectionFollowButton.jsx manages hover/focus state for the follow button UI.
-             * The follow/unfollow callbacks it invokes are covered by CardSections.test.jsx.
+             * SectionFollowButton.jsx is covered by Jest tests
              */
             "content-src/components/DiscoveryStreamComponents/SectionFollowButton/SectionFollowButton.jsx":
               {
@@ -319,8 +318,36 @@ module.exports = function (config) {
                 functions: 0,
                 branches: 0,
               },
+            // Coverage for this component lives in Jest (test/jest/content-src/components/DiscoveryStreamComponents/InterestPicker.test.jsx)
+            "content-src/components/Nova/InterestPicker/InterestPicker.jsx": {
+              statements: 0,
+              lines: 0,
+              functions: 0,
+              branches: 0,
+            },
             // Coverage for this component lives in Jest (test/jest/content-src/components/Widgets/Weather.test.jsx)
             "content-src/components/Widgets/Weather/Weather.jsx": {
+              statements: 0,
+              lines: 0,
+              functions: 0,
+              branches: 0,
+            },
+            // Coverage for this component lives in Jest (test/jest/content-src/components/Widgets/WidgetsSidebar.test.jsx)
+            "content-src/components/Widgets/WidgetsSidebar.jsx": {
+              statements: 0,
+              lines: 0,
+              functions: 0,
+              branches: 0,
+            },
+            // Coverage for this module lives in Jest (test/jest/content-src/components/Widgets/WidgetsRegistry.test.jsx)
+            "content-src/components/Widgets/WidgetsRegistry.mjs": {
+              statements: 0,
+              lines: 0,
+              functions: 0,
+              branches: 0,
+            },
+            // Coverage for this component lives in Jest
+            "content-src/components/Widgets/WidgetsComponentRegistry.jsx": {
               statements: 0,
               lines: 0,
               functions: 0,

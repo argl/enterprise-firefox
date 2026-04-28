@@ -149,9 +149,10 @@ add_task(async function test_hidden_in_popup() {
 });
 
 /**
- * Check that the chat context menu is hidden for chrome:// pages (e.g., Smart Window)
+ * Check that the chat context menu is hidden inside a Smart Window,
+ * both directly and when accessed from a sidebar panel sub-window.
  */
-add_task(async function test_hidden_in_chrome_page() {
+add_task(async function test_hidden_in_smart_window() {
   await SpecialPowers.pushPrefEnv({
     set: [["browser.ml.chat.provider", "http://localhost:8080"]],
   });
@@ -160,22 +161,38 @@ add_task(async function test_hidden_in_chrome_page() {
     "resource:///modules/GenAI.sys.mjs"
   );
   const menu = document.getElementById("context-ask-chat");
-  let hidden = null;
-  await GenAI.buildAskChatMenu(menu, {
-    browser: {
-      browsingContext: {
-        currentURI: { spec: "chrome://browser/content/aiwindow/aiWindow.html" },
+  const aiWindowDoc = {
+    documentElement: { hasAttribute: attr => attr === "ai-window" },
+  };
+  const buildMenu = async ownerGlobal => {
+    let hidden = null;
+    await GenAI.buildAskChatMenu(menu, {
+      browser: {
+        browsingContext: { currentURI: { spec: "https://example.com" } },
+        ownerGlobal,
       },
-    },
-    selectionInfo: {},
-    showItem: (item, show) => {
-      hidden = !show;
-    },
-    source: null,
-    contextTabs: null,
-  });
+      selectionInfo: {},
+      showItem: (item, show) => {
+        hidden = !show;
+      },
+      source: null,
+      contextTabs: null,
+    });
+    return hidden;
+  };
 
-  Assert.ok(hidden, "Menu should be hidden for chrome:// URLs");
+  Assert.ok(
+    await buildMenu({ document: aiWindowDoc }),
+    "Menu hidden when ownerGlobal is the Smart Window"
+  );
+  Assert.ok(
+    await buildMenu({
+      document: { documentElement: { hasAttribute: () => false } },
+      browsingContext: { topChromeWindow: { document: aiWindowDoc } },
+    }),
+    "Menu hidden when ownerGlobal is a sidebar sub-window inside a Smart Window"
+  );
+
   await SpecialPowers.popPrefEnv();
 });
 

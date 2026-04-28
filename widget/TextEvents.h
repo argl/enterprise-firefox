@@ -214,6 +214,10 @@ class WidgetKeyboardEvent final : public WidgetInputEvent {
         mEditCommandsForMultiLineEditorInitialized(false),
         mEditCommandsForRichTextEditorInitialized(false) {}
 
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(WidgetKeyboardEvent,
+                                                    eKeyboardEventClass,
+                                                    eInputEventClass)
+
   // IsInputtingText() and IsInputtingLineBreak() are used to check if
   // it should cause eKeyPress events even on web content.
   // UI Events defines that "keypress" event should be fired "if and only if
@@ -321,9 +325,12 @@ class WidgetKeyboardEvent final : public WidgetInputEvent {
              // XXXedgar, we probably could improve this by referring to
              // EditCommandsConstRef() if we're sure the event target on Linux
              // and macOS is active with any edit commands.
+             // ctrl+f5 is used by web apps e.g. Google Slides as a
+             // presentation/fullscreen shortcut. See bug 2001938
              ((mKeyCode == dom::KeyboardEvent_Binding::DOM_VK_C ||
                mKeyCode == dom::KeyboardEvent_Binding::DOM_VK_V ||
-               mKeyCode == dom::KeyboardEvent_Binding::DOM_VK_X) &&
+               mKeyCode == dom::KeyboardEvent_Binding::DOM_VK_X ||
+               mKeyCode == dom::KeyboardEvent_Binding::DOM_VK_F5) &&
               IsAccel());
     }
 
@@ -910,7 +917,7 @@ class WidgetKeyboardEvent final : public WidgetInputEvent {
  * mozilla::WidgetCompositionEvent
  ******************************************************************************/
 
-class WidgetCompositionEvent : public WidgetGUIEvent {
+class WidgetCompositionEvent final : public WidgetGUIEvent {
  private:
   friend class mozilla::dom::PBrowserParent;
   friend class mozilla::dom::PBrowserChild;
@@ -928,6 +935,10 @@ class WidgetCompositionEvent : public WidgetGUIEvent {
                        aTime),
         mNativeIMEContext(aWidget),
         mOriginalMessage(eVoidEvent) {}
+
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(WidgetCompositionEvent,
+                                                    eCompositionEventClass,
+                                                    eGUIEventClass)
 
   virtual WidgetEvent* Duplicate() const override {
     MOZ_ASSERT(mClass == eCompositionEventClass,
@@ -1012,7 +1023,7 @@ class WidgetCompositionEvent : public WidgetGUIEvent {
  * mozilla::WidgetQueryContentEvent
  ******************************************************************************/
 
-class WidgetQueryContentEvent : public WidgetGUIEvent {
+class WidgetQueryContentEvent final : public WidgetGUIEvent {
  private:
   friend class dom::PBrowserParent;
   friend class dom::PBrowserChild;
@@ -1045,6 +1056,10 @@ class WidgetQueryContentEvent : public WidgetGUIEvent {
         mUseNativeLineBreak(aOtherEvent.mUseNativeLineBreak),
         mWithFontRanges(false),
         mNeedsToFlushLayout(aOtherEvent.mNeedsToFlushLayout) {}
+
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(WidgetQueryContentEvent,
+                                                    eQueryContentEventClass,
+                                                    eGUIEventClass)
 
   WidgetEvent* Duplicate() const override {
     // This event isn't an internal event of any DOM event.
@@ -1401,7 +1416,7 @@ class WidgetQueryContentEvent : public WidgetGUIEvent {
  * mozilla::WidgetSelectionEvent
  ******************************************************************************/
 
-class WidgetSelectionEvent : public WidgetGUIEvent {
+class WidgetSelectionEvent final : public WidgetGUIEvent {
  private:
   friend class mozilla::dom::PBrowserParent;
   friend class mozilla::dom::PBrowserChild;
@@ -1429,6 +1444,10 @@ class WidgetSelectionEvent : public WidgetGUIEvent {
         mSucceeded(false),
         mUseNativeLineBreak(true),
         mReason(nsISelectionListener::NO_REASON) {}
+
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(WidgetSelectionEvent,
+                                                    eSelectionEventClass,
+                                                    eGUIEventClass)
 
   virtual WidgetEvent* Duplicate() const override {
     // This event isn't an internal event of any DOM event.
@@ -1459,7 +1478,7 @@ class WidgetSelectionEvent : public WidgetGUIEvent {
  * mozilla::InternalEditorInputEvent
  ******************************************************************************/
 
-class InternalEditorInputEvent : public InternalUIEvent {
+class InternalEditorInputEvent final : public InternalUIEvent {
  public:
   InternalEditorInputEvent() = delete;
   virtual InternalEditorInputEvent* AsEditorInputEvent() override {
@@ -1471,6 +1490,10 @@ class InternalEditorInputEvent : public InternalUIEvent {
                            const WidgetEventTime* aTime = nullptr)
       : InternalUIEvent(aIsTrusted, aMessage, aWidget, eEditorInputEventClass,
                         aTime) {}
+
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(InternalEditorInputEvent,
+                                                    eEditorInputEventClass,
+                                                    eUIEventClass)
 
   virtual WidgetEvent* Duplicate() const override {
     MOZ_ASSERT(mClass == eEditorInputEventClass,
@@ -1521,7 +1544,7 @@ class InternalEditorInputEvent : public InternalUIEvent {
  * mozilla::InternalLegacyTextEvent
  ******************************************************************************/
 
-class InternalLegacyTextEvent : public InternalUIEvent {
+class InternalLegacyTextEvent final : public InternalUIEvent {
  public:
   InternalLegacyTextEvent() = delete;
 
@@ -1532,6 +1555,10 @@ class InternalLegacyTextEvent : public InternalUIEvent {
                           const WidgetEventTime* aTime = nullptr)
       : InternalUIEvent(aIsTrusted, aMessage, aWidget, eLegacyTextEventClass,
                         aTime) {}
+
+  NS_DEFINE_VIRTUAL_DESTRUCTOR_CHECKING_CLASS_VALUE(InternalLegacyTextEvent,
+                                                    eLegacyTextEventClass,
+                                                    eUIEventClass)
 
   virtual WidgetEvent* Duplicate() const override {
     MOZ_ASSERT(mClass == eLegacyTextEventClass,

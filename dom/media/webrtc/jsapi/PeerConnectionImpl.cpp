@@ -6,7 +6,6 @@
 
 #include <cerrno>
 #include <cstdlib>
-#include <deque>
 #include <set>
 #include <sstream>
 #include <vector>
@@ -2560,12 +2559,40 @@ void PeerConnectionImpl::ParseIceServers(
   }
 }
 
+static JsepRtcpMuxPolicy ToJsepRtcpMuxPolicy(dom::RTCRtcpMuxPolicy aPolicy) {
+  switch (aPolicy) {
+    case dom::RTCRtcpMuxPolicy::Require:
+      return kRtcpMuxRequire;
+    case dom::RTCRtcpMuxPolicy::Negotiate:
+      return kRtcpMuxNegotiate;
+  }
+  MOZ_CRASH("Unexpected RTCRtcpMuxPolicy value");
+}
+
 void PeerConnectionImpl::SetConfiguration(
     const RTCConfiguration& aConfiguration, ErrorResult& aRv) {
+  // Spec: check rtcpMuxPolicy consistency before ICE server validation.
+  if (!mRtcpMuxPolicy.isSome()) {
+    if (NS_FAILED(mJsepSession->SetRtcpMuxPolicy(
+            ToJsepRtcpMuxPolicy(aConfiguration.mRtcpMuxPolicy)))) {
+      aRv.ThrowOperationError("Failed to set rtcpMuxPolicy");
+      return;
+    }
+    mRtcpMuxPolicy = Some(aConfiguration.mRtcpMuxPolicy);
+    if (aConfiguration.mRtcpMuxPolicy == dom::RTCRtcpMuxPolicy::Negotiate) {
+      mozilla::glean::rtcpeerconnection::count_rtcp_mux_policy_negotiate.Add(1);
+    }
+  } else if (*mRtcpMuxPolicy != aConfiguration.mRtcpMuxPolicy) {
+    aRv.ThrowInvalidModificationError(
+        "Cannot change rtcpMuxPolicy with setConfiguration");
+    return;
+  }
+
   ParseIceServers(aConfiguration.mIceServers, aRv);
   if (aRv.Failed()) {
     return;
   }
+
   aRv = SetConfiguration(aConfiguration);
 }
 

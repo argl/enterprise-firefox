@@ -220,6 +220,7 @@ this.felt = class extends ExtensionAPI {
         "FeltParent:TransitionFeltToBackground",
         this
       );
+      Services.ppmm.addMessageListener("FeltParent:ForceFeltFocus", this);
     } else if (Services.felt.isFeltBrowser()) {
       // In the real Firefox, register observer to handle URLs
       Services.obs.addObserver(this.urlObserver, "felt-open-url");
@@ -306,6 +307,16 @@ this.felt = class extends ExtensionAPI {
         this.closeWindow();
         const success = Services.felt.makeBackgroundProcess(true);
         lazy.log.debug(`FeltExtension: makeBackgroundProcess? ${success}`);
+        break;
+      }
+
+      case "FeltParent:ForceFeltFocus": {
+        lazy.log.debug(
+          `FeltExtension: forcing window focus: this._win=${this._win}`
+        );
+        if (this._win) {
+          this._win.focus();
+        }
         break;
       }
 

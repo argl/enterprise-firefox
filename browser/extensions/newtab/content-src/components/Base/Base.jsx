@@ -15,7 +15,7 @@ import { TopSites } from "content-src/components/TopSites/TopSites";
 import { Sections } from "content-src/components/Sections/Sections";
 import { Logo } from "content-src/components/Logo/Logo";
 import { Weather } from "content-src/components/Weather/Weather";
-import { Weather as WeatherWidget } from "content-src/components/Widgets/Weather/Weather";
+import { WidgetsSidebar } from "content-src/components/Widgets/WidgetsSidebar";
 import { DownloadModalToggle } from "content-src/components/DownloadModalToggle/DownloadModalToggle";
 import { Notifications } from "content-src/components/Notifications/Notifications";
 import { TopicSelection } from "content-src/components/DiscoveryStreamComponents/TopicSelection/TopicSelection";
@@ -29,6 +29,11 @@ import {
   shouldShowOMCHighlight,
   shouldShowASRouterNewTabMessage,
 } from "../../lib/asrouter-message-utils.mjs";
+import {
+  WIDGET_REGISTRY,
+  resolveWidgetHasSidebar,
+  resolveWidgetSize,
+} from "content-src/components/Widgets/WidgetsRegistry.mjs";
 
 const VISIBLE = "visible";
 const VISIBILITY_CHANGE_EVENT = "visibilitychange";
@@ -209,7 +214,9 @@ export class BaseContent extends React.PureComponent {
     this.applyBodyClasses();
     global.addEventListener("scroll", this.onWindowScroll);
     const prefs = this.props.Prefs.values;
+    const novaEnabled = prefs[PREF_NOVA_ENABLED];
     const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
+    const wallpapersUserEnabled = prefs["newtabWallpapers.user.enabled"];
 
     if (this.props.document.visibilityState === VISIBLE) {
       this.onVisible();
@@ -239,7 +246,10 @@ export class BaseContent extends React.PureComponent {
       this.handleColorModeChange
     );
     this.handleColorModeChange();
-    if (wallpapersEnabled) {
+    const isWallpaperVisible = novaEnabled
+      ? wallpapersEnabled && wallpapersUserEnabled
+      : wallpapersEnabled;
+    if (isWallpaperVisible) {
       this.updateWallpaper();
     }
 
@@ -277,16 +287,40 @@ export class BaseContent extends React.PureComponent {
     const prefs = this.props.Prefs.values;
 
     // Check if weather widget was re-enabled from customization menu
-    const wasWeatherDisabled = !prevProps.Prefs.values.showWeather;
-    const isWeatherEnabled = this.props.Prefs.values.showWeather;
+    // @nova-cleanup(remove-conditional): Remove novaEnabledInUpdate and weatherPref variables; replace wasWeatherDisabled/isWeatherEnabled with direct reads of prevProps/props.Prefs.values["widgets.weather.enabled"]
+    const novaEnabledInUpdate = this.props.Prefs.values["nova.enabled"];
+    const weatherPref = novaEnabledInUpdate
+      ? "widgets.weather.enabled"
+      : "showWeather";
+    const wasWeatherDisabled = !prevProps.Prefs.values[weatherPref];
+    const isWeatherEnabled = this.props.Prefs.values[weatherPref];
 
     if (wasWeatherDisabled && isWeatherEnabled) {
       // If weather widget was enabled from customization menu, display opt-in dialog
       this.props.dispatch(ac.SetPref("weather.optInDisplayed", true));
     }
 
+    const novaEnabled = prefs[PREF_NOVA_ENABLED];
     const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
-    if (wallpapersEnabled) {
+    const wallpapersUserEnabled = prefs["newtabWallpapers.user.enabled"];
+    // Previous values of the wallpaper prefs, used to compare against the
+    // current values and detect what changed since the last render.
+    const prevNovaEnabled = prevProps.Prefs.values[PREF_NOVA_ENABLED];
+    const prevWallpapersEnabled =
+      prevProps.Prefs.values["newtabWallpapers.enabled"];
+    const prevWallpapersUserEnabled =
+      prevProps.Prefs.values["newtabWallpapers.user.enabled"];
+
+    const isWallpaperActive = novaEnabled
+      ? wallpapersEnabled && wallpapersUserEnabled
+      : wallpapersEnabled;
+    // This checks if the wallpaper was active before this update so that we can
+    // detect when it just turned off and clear it from the background.
+    const wasWallpaperActive = prevNovaEnabled
+      ? prevWallpapersEnabled && prevWallpapersUserEnabled
+      : prevWallpapersEnabled;
+
+    if (isWallpaperActive) {
       // destructure current and previous props with fallbacks
       // (preventing undefined errors)
       const {
@@ -313,6 +347,7 @@ export class BaseContent extends React.PureComponent {
 
       // don't update wallpaper unless the wallpaper is being changed.
       if (
+        !wasWallpaperActive || // the wallpaper wasn't active last render but is now, meaning it was just enabled, force an apply even if nothing else changed
         selectedWallpaper !== prevSelectedWallpaper || // selecting a new wallpaper
         initialWallpaper !== prevInitialWallpaper || // experiment sets initial wallpaper
         uploadedWallpaper !== prevUploadedWallpaper || // uploading a new wallpaper
@@ -323,6 +358,9 @@ export class BaseContent extends React.PureComponent {
       ) {
         this.updateWallpaper();
       }
+    } else if (wasWallpaperActive) {
+      // The wallpaper was active last render but isn't anymore, meaning it was just turned off — clear it from the background
+      this.updateWallpaper();
     }
 
     this.spocsOnDemandUpdated();
@@ -525,9 +563,16 @@ export class BaseContent extends React.PureComponent {
 
   async updateWallpaper() {
     const prefs = this.props.Prefs.values;
-    const selectedWallpaper =
-      prefs["newtabWallpapers.wallpaper"] ||
-      prefs["newtabWallpapers.initialWallpaper"];
+    const novaEnabled = prefs[PREF_NOVA_ENABLED];
+    const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
+    const wallpapersUserEnabled = prefs["newtabWallpapers.user.enabled"];
+    const isWallpaperVisible = novaEnabled
+      ? wallpapersEnabled && wallpapersUserEnabled
+      : wallpapersEnabled;
+    const selectedWallpaper = isWallpaperVisible
+      ? prefs["newtabWallpapers.wallpaper"] ||
+        prefs["newtabWallpapers.initialWallpaper"]
+      : null;
     const { wallpaperList, uploadedWallpaper: uploadedWallpaperUrl } =
       this.props.Wallpapers;
     const uploadedWallpaperTheme =
@@ -716,7 +761,11 @@ export class BaseContent extends React.PureComponent {
       prefs[`newtabWallpapers.wallpaper`] ||
       prefs[`newtabWallpapers.initialWallpaper`];
     const wallpapersEnabled = prefs["newtabWallpapers.enabled"];
-    const weatherEnabled = prefs.showWeather;
+    const wallpapersUserEnabled = prefs["newtabWallpapers.user.enabled"];
+    // @nova-cleanup(remove-conditional): Remove conditional; replace with prefs["widgets.weather.enabled"]
+    const weatherEnabled = novaEnabled
+      ? prefs["widgets.weather.enabled"]
+      : prefs.showWeather;
     const { showTopicSelection } = DiscoveryStream;
     const mayShowTopicSelection =
       showTopicSelection && prefs["discoverystream.topicSelection.enabled"];
@@ -778,12 +827,6 @@ export class BaseContent extends React.PureComponent {
     const mayHaveWeatherWidget =
       prefs["widgets.system.weather.enabled"] ||
       prefs.trainhopConfig?.widgets?.weatherEnabled;
-    const showWeatherWidgetInSidebar =
-      novaEnabled &&
-      mayHaveWeatherWidget &&
-      prefs["widgets.weather.enabled"] &&
-      weatherEnabled &&
-      prefs["widgets.weather.size"] === "small";
 
     // These prefs set the initial values on the Customize panel toggle switches
     const enabledWidgets = {
@@ -877,12 +920,16 @@ export class BaseContent extends React.PureComponent {
       // Logo renders in .content (above search/topsites) when no Pocket content
       // feed and no content-area widgets are present. When either is enabled,
       // the sidebar provides a better visual anchor.
+      const weatherWidget = WIDGET_REGISTRY.find(w => w.id === "weather");
+      const weatherGoesToSidebar =
+        resolveWidgetHasSidebar(weatherWidget, prefs) &&
+        resolveWidgetSize(weatherWidget, prefs) === "small";
       const hasContentWidgets =
         (mayHaveListsWidget && enabledWidgets.listsEnabled) ||
         (mayHaveTimerWidget && enabledWidgets.timerEnabled) ||
         (mayHaveWeatherWidget &&
           enabledWidgets.weatherEnabled &&
-          !showWeatherWidgetInSidebar);
+          !weatherGoesToSidebar);
       const logoShouldBeCentered = !pocketEnabled && !hasContentWidgets;
 
       return (
@@ -890,15 +937,24 @@ export class BaseContent extends React.PureComponent {
           <div
             className={`container nova-enabled${logoShouldBeCentered ? " logo-in-content" : ""}`}
           >
-            <div className="sidebar-inline-start">
+            <aside className="sidebar-inline-start">
               {!logoShouldBeCentered && (
                 <ErrorBoundary>
                   <Logo />
                 </ErrorBoundary>
               )}
               {/* Future: Page Nav  */}
-            </div>
-            <div className="content">
+            </aside>
+            {/* Bug 2021460 - Placed before <main> in DOM order so small widgets
+            are tab-focused before the main content feed. */}
+            <aside className="sidebar-inline-end">
+              {novaEnabled && (
+                <ErrorBoundary>
+                  <WidgetsSidebar dispatch={props.dispatch} />
+                </ErrorBoundary>
+              )}
+            </aside>
+            <main className="content">
               {logoShouldBeCentered && (
                 <ErrorBoundary>
                   <Logo />
@@ -997,18 +1053,10 @@ export class BaseContent extends React.PureComponent {
                   />
                 </ErrorBoundary>
               )}
-            </div>
-            <div className="sidebar-inline-end">
-              {/* Mini Widgets - Weather */}
-              {showWeatherWidgetInSidebar && (
-                <ErrorBoundary>
-                  <WeatherWidget dispatch={props.dispatch} size="small" />
-                </ErrorBoundary>
-              )}
-            </div>
+            </main>
           </div>
           <ConfirmDialog />
-          <menu className="personalizeButtonWrapper">
+          <menu className="personalizeButtonWrapper nova-enabled">
             <CustomizeMenu
               onClose={this.closeCustomizationMenu}
               onOpen={this.openCustomizationMenu}
@@ -1017,6 +1065,7 @@ export class BaseContent extends React.PureComponent {
               enabledSections={enabledSections}
               enabledWidgets={enabledWidgets}
               wallpapersEnabled={wallpapersEnabled}
+              wallpapersUserEnabled={wallpapersUserEnabled}
               activeWallpaper={activeWallpaper}
               pocketRegion={pocketRegion}
               mayHaveTopicSections={mayHavePersonalizedTopicSections}
@@ -1037,6 +1086,17 @@ export class BaseContent extends React.PureComponent {
               widgetsEnabled={prefs["widgets.enabled"]}
               dispatch={this.props.dispatch}
             />
+            {shouldShowOMCHighlight(
+              this.props.Messages,
+              "CustomWallpaperHighlight"
+            ) && (
+              <MessageWrapper dispatch={this.props.dispatch}>
+                <WallpaperFeatureHighlight
+                  position="inset-block-start inset-inline-start"
+                  dispatch={this.props.dispatch}
+                />
+              </MessageWrapper>
+            )}
           </menu>
           {this.props.Notifications?.showNotifications && (
             <ErrorBoundary>
@@ -1163,6 +1223,7 @@ export class BaseContent extends React.PureComponent {
             enabledSections={enabledSections}
             enabledWidgets={enabledWidgets}
             wallpapersEnabled={wallpapersEnabled}
+            wallpapersUserEnabled={wallpapersUserEnabled}
             activeWallpaper={activeWallpaper}
             pocketRegion={pocketRegion}
             mayHaveTopicSections={mayHavePersonalizedTopicSections}

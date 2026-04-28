@@ -22,6 +22,7 @@ import androidx.fragment.compose.content
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import kotlinx.coroutines.launch
+import mozilla.components.concept.engine.webextension.InstallationMethod
 import mozilla.components.lib.state.helpers.StoreProvider.Companion.fragmentStore
 import mozilla.components.service.nimbus.evalJexlSafe
 import mozilla.components.service.nimbus.messaging.use
@@ -85,11 +86,23 @@ class OnboardingFragment : Fragment() {
 
     private val pagesToDisplay by lazy {
         with(requireContext()) {
-            pagesToDisplay(
-                showDefaultBrowserPage = displayDefaultBrowserPage(this),
-                showNotificationPage = canShowNotificationPage(),
-                showAddWidgetPage = canShowAddSearchWidgetPrompt(AppWidgetManager.getInstance(activity)),
-            ).toMutableList()
+            if (settings().rtamoAddonDownloadUrl.isNotBlank()) {
+                pagesToDisplay(
+                    showDefaultBrowserPage = false,
+                    showNotificationPage = false,
+                    showAddWidgetPage = false,
+                ).filter {
+                    it.type == OnboardingPageUiData.Type.TERMS_OF_SERVICE
+                }.toMutableList()
+            } else {
+                pagesToDisplay(
+                    showDefaultBrowserPage = displayDefaultBrowserPage(this),
+                    showNotificationPage = canShowNotificationPage(),
+                    showAddWidgetPage = AppWidgetManager.getInstance(requireContext())
+                        ?.let { canShowAddSearchWidgetPrompt(it) }
+                        ?: false,
+                ).toMutableList()
+            }
         }
     }
 
@@ -273,7 +286,6 @@ class OnboardingFragment : Fragment() {
             },
             onFinish = {
                 onFinish(it)
-                enableSearchBarCFRForNewUser()
             },
             onImpression = {
                 telemetryRecorder.onImpression(
@@ -364,14 +376,14 @@ class OnboardingFragment : Fragment() {
                 telemetryRecorder.onNotificationPermissionClick(
                     sequenceId = pagesToDisplay.telemetrySequenceId(),
                     sequencePosition =
-                    pagesToDisplay.sequencePosition(OnboardingPageUiData.Type.NOTIFICATION_PERMISSION),
+                        pagesToDisplay.sequencePosition(OnboardingPageUiData.Type.NOTIFICATION_PERMISSION),
                 )
             },
             onSkipNotificationClick = {
                 telemetryRecorder.onSkipTurnOnNotificationsClick(
                     sequenceId = pagesToDisplay.telemetrySequenceId(),
                     sequencePosition =
-                    pagesToDisplay.sequencePosition(OnboardingPageUiData.Type.NOTIFICATION_PERMISSION),
+                        pagesToDisplay.sequencePosition(OnboardingPageUiData.Type.NOTIFICATION_PERMISSION),
                 )
             },
             onAddFirefoxWidgetClick = {
@@ -389,7 +401,6 @@ class OnboardingFragment : Fragment() {
             },
             onFinish = {
                 onFinish(it)
-                enableSearchBarCFRForNewUser()
             },
             onImpression = {
                 telemetryRecorder.onImpression(
@@ -503,16 +514,21 @@ class OnboardingFragment : Fragment() {
             isDailyUsagePingEnabled = false,
         )
 
+        val downloadUrl = settings.rtamoAddonDownloadUrl
+        if (downloadUrl.isNotBlank()) {
+            settings.rtamoAddonDownloadUrl = ""
+            requireComponents.addonManager.installAddon(
+                url = downloadUrl,
+                installationMethod = InstallationMethod.RTAMO,
+            )
+        }
+
         findNavController().nav(
             id = R.id.onboardingFragment,
             directions = OnboardingFragmentDirections.actionHome(),
         )
 
         maybeAddMenuNotification()
-    }
-
-    private fun enableSearchBarCFRForNewUser() {
-        requireContext().settings().shouldShowSearchBarCFR = FxNimbus.features.encourageSearchCfr.value().enabled
     }
 
     private fun isNotDefaultBrowser(context: Context) =

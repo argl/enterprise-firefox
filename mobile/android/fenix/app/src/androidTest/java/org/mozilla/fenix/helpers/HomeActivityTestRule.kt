@@ -69,9 +69,9 @@ class HomeActivityTestRule(
         isTabSwipeCFREnabled: Boolean = false,
         isTermsOfServiceAccepted: Boolean = true,
         openLinksInExternalApp: OpenLinksInApp = getOpenLinksInApp(settings),
-        hasSeenBrowserToolbarCFR: Boolean = true,
         hasSeenShakeToSummarizeToolbarCfr: Boolean = true,
         isPrivateModeAndStoriesEntryPointEnabled: Boolean = false,
+        shouldUseExpandedToolbar: Boolean = false,
     ) : this(initialTouchMode, launchActivity, skipOnboarding) {
         this.isPocketEnabled = isPocketEnabled
         this.isRecentTabsFeatureEnabled = isRecentTabsFeatureEnabled
@@ -91,9 +91,9 @@ class HomeActivityTestRule(
         this.isTabSwipeCFREnabled = isTabSwipeCFREnabled
         this.isTermsOfServiceAccepted = isTermsOfServiceAccepted
         this.openLinksInExternalApp = openLinksInExternalApp
-        this.hasSeenBrowserToolbarCFR = hasSeenBrowserToolbarCFR
         this.hasSeenShakeToSummarizeToolbarCfr = hasSeenShakeToSummarizeToolbarCfr
         this.isPrivateModeAndStoriesEntryPointEnabled = isPrivateModeAndStoriesEntryPointEnabled
+        this.shouldUseExpandedToolbar = shouldUseExpandedToolbar
     }
 
     /**
@@ -203,9 +203,9 @@ class HomeActivityIntentTestRule internal constructor(
         isTermsOfServiceAccepted: Boolean = true,
         openLinksInExternalApp: OpenLinksInApp = getOpenLinksInApp(settings),
         tabManagerOpeningAnimationEnabled: Boolean = false,
-        hasSeenBrowserToolbarCFR: Boolean = true,
         hasSeenShakeToSummarizeToolbarCfr: Boolean = true,
         isPrivateModeAndStoriesEntryPointEnabled: Boolean = false,
+        shouldUseExpandedToolbar: Boolean = false,
     ) : this(initialTouchMode, launchActivity, skipOnboarding) {
         this.isPocketEnabled = isPocketEnabled
         this.isRecentTabsFeatureEnabled = isRecentTabsFeatureEnabled
@@ -226,9 +226,9 @@ class HomeActivityIntentTestRule internal constructor(
         this.isTermsOfServiceAccepted = isTermsOfServiceAccepted
         this.openLinksInExternalApp = openLinksInExternalApp
         this.tabManagerOpeningAnimationEnabled = tabManagerOpeningAnimationEnabled
-        this.hasSeenBrowserToolbarCFR = hasSeenBrowserToolbarCFR
         this.hasSeenShakeToSummarizeToolbarCfr = hasSeenShakeToSummarizeToolbarCfr
         this.isPrivateModeAndStoriesEntryPointEnabled = isPrivateModeAndStoriesEntryPointEnabled
+        this.shouldUseExpandedToolbar = shouldUseExpandedToolbar
     }
 
     private val longTapUserPreference = getLongPressTimeout()
@@ -301,7 +301,6 @@ class HomeActivityIntentTestRule internal constructor(
         isTermsOfServiceAccepted = settings.hasAcceptedTermsOfService
         openLinksInExternalApp = getOpenLinksInApp(settings)
         tabManagerOpeningAnimationEnabled = settings.tabManagerOpeningAnimationEnabled
-        hasSeenBrowserToolbarCFR = settings.hasSeenBrowserToolbarCFR
         hasSeenShakeToSummarizeToolbarCfr = settings.shakeToSummarizeToolbarCfrShown
         isPrivateModeAndStoriesEntryPointEnabled = settings.privateModeAndStoriesEntryPointEnabled
     }

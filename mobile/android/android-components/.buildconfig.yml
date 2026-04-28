@@ -454,6 +454,20 @@ projects:
     - components:support-base
     - components:support-test
     - components:tooling-lint
+  components:concept-bookmarks-file:
+    description: An abstract definition of a component for importing bookmarks from
+      a file.
+    path: components/concept/bookmarks-file
+    publish: true
+    upstream_dependencies:
+    - components:tooling-lint
+  components:concept-bookmarks-parser:
+    description: An abstract definition of a bookmark-file-parser component.
+    path: components/concept/bookmarks-parser
+    publish: true
+    upstream_dependencies:
+    - components:concept-storage-bookmarks
+    - components:tooling-lint
   components:concept-engine:
     description: An abstract layer hiding the actual browser engine implementation.
     path: components/concept/engine
@@ -526,6 +540,13 @@ projects:
     - components:support-ktx
     - components:support-test
     - components:support-utils
+    - components:tooling-lint
+  components:concept-storage-bookmarks:
+    description: This component contains interfaces and abstract classes that describe
+      the bookmarks storage layer.
+    path: components/concept/storage-bookmarks
+    publish: true
+    upstream_dependencies:
     - components:tooling-lint
   components:concept-sync:
     description: An abstract definition of a browser data synchronization layer.
@@ -954,6 +975,19 @@ projects:
     - components:support-utils
     - components:tooling-lint
     - components:ui-icons
+  components:feature-importer:
+    description: A feature that handles importing bookmarks and passwords.
+    path: components/feature/importer
+    publish: true
+    upstream_dependencies:
+    - components:concept-base
+    - components:concept-fetch
+    - components:lib-publicsuffixlist
+    - components:lib-state
+    - components:support-base
+    - components:support-ktx
+    - components:support-utils
+    - components:tooling-lint
   components:feature-intent:
     description: Combining various feature components for intent processing.
     path: components/feature/intent
@@ -1803,6 +1837,14 @@ projects:
     - components:concept-fetch
     - components:support-base
     - components:support-test
+    - components:tooling-lint
+  components:lib-bookmarks-file:
+    description: A concrete implementation of concept-bookmarks-file-importer that
+      parses Netscape HTML bookmark files.
+    path: components/lib/bookmarks-file
+    publish: true
+    upstream_dependencies:
+    - components:concept-bookmarks-file
     - components:tooling-lint
   components:lib-crash:
     description: A generic crash reporter library that can report crashes to multiple

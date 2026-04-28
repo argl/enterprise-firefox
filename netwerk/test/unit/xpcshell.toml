@@ -95,17 +95,6 @@ skip-if = [
 ["test_altsvc.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
 
-["test_altsvc_http3.js"]
-run-sequentially = ["true"] # http3server
-skip-if = [
-  "os == 'android' && os_version == '14' && arch == 'x86_64'",
-  "os == 'win' && os_version == '10.2009' && arch == 'x86_64'", # Bug 1807931
-  "os == 'win' && os_version == '11.26100' && arch == 'x86'", # Bug 1807931
-  "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && msix", # Bug 1807931
-  "os == 'win' && os_version == '11.26200' && arch == 'x86'", # Bug 1807931
-  "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 1807931
-]
-
 ["test_altsvc_pref.js"]
 skip-if = [
   "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && msix",
@@ -577,6 +566,8 @@ run-sequentially = [
 
 ["test_cookies_partition_migration.js"]
 
+["test_cookies_validation_epoch.js"]
+
 ["test_cookies_privatebrowsing.js"]
 
 ["test_cookies_profile_close.js"]
@@ -702,6 +693,11 @@ run-if = [
 
 ["test_file_url_with_host.js"]
 
+["test_file_root.js"]
+skip-if = [
+  "os == 'android'",
+]
+
 ["test_filestreams.js"]
 
 ["test_freshconnection.js"]
@@ -736,6 +732,12 @@ skip-if = [
 
 ["test_happy_eyeballs_concurrent_channels.js"]
 run-sequentially = ["true"]
+
+["test_happy_eyeballs_cancel_and_reuse.js"]
+skip-if = [
+  "os == 'android'",
+  "os == 'win' && msix",
+]
 
 ["test_happy_eyeballs_conn_failure.js"]
 run-sequentially = ["true"] # node server exceptions dont replay well
@@ -1478,6 +1480,13 @@ skip-if = [
   "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 1808048
 ]
 
+["test_retry_decrypt_error.js"]
+run-sequentially = ["true"] # tlsserver uses fixed port
+skip-if = [
+  "os == 'win' && os_version == '11.26100' && arch == 'x86_64' && msix", # Bug 2034343
+  "os == 'win' && os_version == '11.26200' && arch == 'x86_64' && msix", # Bug 2034343
+]
+
 ["test_safeoutputstream.js"]
 
 ["test_safeoutputstream_append.js"]
@@ -1608,6 +1617,11 @@ head = "head_channels.js head_cache.js head_cookies.js head_trr.js head_http3.js
 ["test_trr_additional_section.js"]
 
 ["test_trr_af_fallback.js"]
+
+["test_trr_background_cleanup.js"]
+run-if = [
+  "!socketprocess_networking",
+]
 
 ["test_trr_bench.js"]
 skip-if = [

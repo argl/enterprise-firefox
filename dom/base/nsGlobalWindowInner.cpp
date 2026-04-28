@@ -2204,6 +2204,8 @@ enum class EmptyFrameLibrary {
 // https://github.com/gwtproject/gwt/blob/4b6a646faf0e9ce579658d78b6acf9fe5c840379/user/src/com/google/gwt/user/client/ui/impl/RichTextAreaImplMozilla.java#L44
 // .
 //
+// Polarion appears to use the GWT Editor too, but with a different class name.
+//
 // Old version of ZE appears to have a similar problem. Newer versions don't,
 // because they have `srcdoc`. See bug 2020668.
 MOZ_CAN_RUN_SCRIPT static bool IsDeferredLoadEmptyFrame(Element& aEmbedder) {
@@ -2217,6 +2219,10 @@ MOZ_CAN_RUN_SCRIPT static bool IsDeferredLoadEmptyFrame(Element& aEmbedder) {
     lib = EmptyFrameLibrary::CKEditor;
   } else if (StaticPrefs::dom_about_blank_gwt_hack_enabled() &&
              classes->Contains(nsGkAtoms::gwt_RichTextArea, eCaseMatters)) {
+    lib = EmptyFrameLibrary::GWT;
+  } else if (StaticPrefs::dom_about_blank_polarion_gwt_hack_enabled() &&
+             classes->Contains(nsGkAtoms::polarion_rte_RichTextArea,
+                               eCaseMatters)) {
     lib = EmptyFrameLibrary::GWT;
   } else if (StaticPrefs::dom_about_blank_ze_hack_enabled() &&
              classes->Contains(nsGkAtoms::ze_area, eCaseMatters)) {
@@ -6335,19 +6341,22 @@ class WindowScriptTimeoutHandler final : public ScriptTimeoutHandler {
   WindowScriptTimeoutHandler(JSContext* aCx, nsIGlobalObject* aGlobal,
                              const nsAString& aExpression)
       : ScriptTimeoutHandler(aCx, aGlobal, aExpression),
-        mInitiatingScript(ScriptLoader::GetActiveScript(aCx)) {}
+        mInitiatingScriptFetchInfo(
+            ScriptLoader::GetActiveScriptFetchInfo(aCx)) {}
 
   MOZ_CAN_RUN_SCRIPT virtual bool Call(const char* aExecutionReason) override;
 
  private:
   virtual ~WindowScriptTimeoutHandler() = default;
 
-  // Initiating script for use when evaluating mExpr on the main thread.
-  RefPtr<JS::loader::LoadedScript> mInitiatingScript;
+  // Initiating script's referrer info for use when evaluating mExpr on the main
+  // thread.
+  RefPtr<JS::loader::ScriptFetchInfo> mInitiatingScriptFetchInfo;
 };
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(WindowScriptTimeoutHandler,
-                                   ScriptTimeoutHandler, mInitiatingScript)
+                                   ScriptTimeoutHandler,
+                                   mInitiatingScriptFetchInfo)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(WindowScriptTimeoutHandler)
 NS_INTERFACE_MAP_END_INHERITING(ScriptTimeoutHandler)
@@ -6391,8 +6400,8 @@ bool WindowScriptTimeoutHandler::Call(const char* aExecutionReason) {
 
     if (script) {
       MOZ_ASSERT(!erv.Failed());
-      if (mInitiatingScript) {
-        mInitiatingScript->AssociateWithScript(script);
+      if (mInitiatingScriptFetchInfo) {
+        mInitiatingScriptFetchInfo->AssociateWithScript(script);
       }
 
       if (!JS_ExecuteScript(aes.cx(), script)) {

@@ -108,7 +108,7 @@ sealed interface DownloadUIAction : Action {
     /**
      * [DownloadUIAction] to show the dialog to change the file extension of a [FileItem].
      */
-    data object ShowChangeFileExtensionDialog : DownloadUIAction
+    data class ShowChangeFileExtensionDialog(val item: FileItem) : DownloadUIAction
 
     /**
      * [DownloadUIAction] to close the dialog to change the file extension of a [FileItem].
@@ -206,6 +206,13 @@ sealed interface RenameFileError {
      * @property proposedFileName The name the user attempted to rename the file to.
      */
     data class NameAlreadyExists(val proposedFileName: String) : RenameFileError
+
+    /**
+     * The proposed file name only differs from the current name by its casing.
+     *
+     * @property proposedFileName The name the user attempted to rename the file to.
+     */
+    data class CaseOnlyNameChange(val proposedFileName: String) : RenameFileError
 
     /**
      * The proposed file name is not valid and has a path separator or slash.

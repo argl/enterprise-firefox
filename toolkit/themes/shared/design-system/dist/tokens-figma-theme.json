@@ -405,9 +405,9 @@
   "button/icon/fill": "currentColor",
   "button/icon/stroke": "{Theme$button/icon/fill}",
   "button/opacity/disabled": {
-    "light": 50,
-    "dark": 50,
-    "forcedColors": 100
+    "light": 0.5,
+    "dark": 0.5,
+    "forcedColors": 1
   },
   "button/text/color": {
     "light": "{Colors$color/gray/100}",
@@ -564,6 +564,11 @@
     "dark": "{Colors$color/red/20}",
     "forcedColors": "{Theme$icon/color}"
   },
+  "input/border/color": {
+    "light": "{Theme$border/color/interactive}",
+    "dark": "{Theme$border/color/interactive}",
+    "forcedColors": "{Theme$border/color/interactive}"
+  },
   "link/color": {
     "light": "{Theme$color/accent/primary}",
     "dark": "{Theme$color/accent/primary}",
@@ -583,6 +588,16 @@
     "light": "{Theme$link/color}",
     "dark": "{Theme$link/color}",
     "forcedColors": "{Theme$link/color}"
+  },
+  "opacity/deemphasized-strong": {
+    "light": 0.6,
+    "dark": 0.6,
+    "forcedColors": 1
+  },
+  "opacity/deemphasized": {
+    "light": 0.8,
+    "dark": 0.8,
+    "forcedColors": 1
   },
   "table/background/color": {
     "light": "#f8f8fa",
@@ -614,6 +629,116 @@
     "dark": "{Colors$color/gray/80}",
     "forcedColors": "{Theme$background/color/canvas}"
   },
+  "toolbar/field/border/color": {
+    "light": "{Theme$border/color/transparent}",
+    "dark": "{Theme$border/color/transparent}",
+    "forcedColors": "{Theme$input/border/color}"
+  },
+  "toolbar/field/background/color": {
+    "light": "rgba(0, 0, 0, 0.05)",
+    "dark": "{Colors$color/black/alpha/30}",
+    "forcedColors": "{HCM Theme$Field}"
+  },
+  "toolbar/field/color": {
+    "light": "{Colors$color/gray/100}",
+    "dark": "{Colors$color/gray/05}",
+    "forcedColors": "{HCM Theme$FieldText}"
+  },
+  "toolbar/field/focus/background/color": {
+    "light": "{Colors$color/white}",
+    "dark": "rgb(66, 65, 77)",
+    "forcedColors": "transparent"
+  },
+  "toolbar/field/focus/color": {
+    "light": "{Colors$color/black}",
+    "dark": "{Colors$color/gray/05}",
+    "forcedColors": "transparent"
+  },
+  "toolbar/field/focus/border/color": {
+    "light": "color-mix(in srgb, {Theme$focus/outline/color} 50%, transparent)",
+    "dark": "color-mix(in srgb, {Theme$focus/outline/color} 50%, transparent)",
+    "forcedColors": "{Theme$focus/outline/color}"
+  },
+  "toolbar/bgcolor": {
+    "light": "#f9f9fb",
+    "dark": "rgb(43, 42, 51)",
+    "forcedColors": "transparent"
+  },
+  "toolbar/color": {
+    "light": "{Colors$color/gray/100}",
+    "dark": "{Colors$color/gray/05}",
+    "forcedColors": "transparent"
+  },
+  "toolbarbutton/icon/fill": {
+    "light": "{Colors$color/gray/70}",
+    "dark": "{Colors$color/gray/05}",
+    "forcedColors": "transparent"
+  },
+  "toolbarbutton/icon/fill/attention": {
+    "light": "{Colors$color/blue/60}",
+    "dark": "{Colors$color/cyan/30}",
+    "forcedColors": "transparent"
+  },
+  "toolbarbutton/icon/fill/attention/text": {
+    "light": "{Colors$color/gray/20}",
+    "dark": "{Colors$color/gray/90}",
+    "forcedColors": "transparent"
+  },
+  "toolbarbutton/disabled/opacity": {
+    "light": "{Theme$button/opacity/disabled}",
+    "dark": "{Theme$button/opacity/disabled}",
+    "forcedColors": "{Theme$button/opacity/disabled}"
+  },
+  "toolbarbutton/hover/outline/color": {
+    "light": "transparent",
+    "dark": "transparent",
+    "forcedColors": "{HCM Theme$SelectedItem}"
+  },
+  "toolbarbutton/active/outline/color": {
+    "light": "transparent",
+    "dark": "transparent",
+    "forcedColors": "{HCM Theme$ButtonText}"
+  },
+  "toolbarbutton/selected/outline/color": {
+    "light": "{Theme$toolbarbutton/active/outline/color}",
+    "dark": "{Theme$toolbarbutton/active/outline/color}",
+    "forcedColors": "{HCM Theme$SelectedItem}"
+  },
+  "toolbarbutton/outline": {
+    "light": "{Primitives$border/width} solid {Theme$toolbarbutton/outline/color}",
+    "dark": "{Primitives$border/width} solid {Theme$toolbarbutton/outline/color}",
+    "forcedColors": "{Primitives$border/width} solid {Theme$toolbarbutton/outline/color}"
+  },
+  "toolbarbutton/outline/color": {
+    "light": "transparent",
+    "dark": "transparent",
+    "forcedColors": "{HCM Theme$ButtonText}"
+  },
+  "toolbarseparator/color": {
+    "light": "{Theme$text/color/deemphasized}",
+    "dark": "{Theme$text/color/deemphasized}",
+    "forcedColors": "{Theme$text/color/deemphasized}"
+  },
+  "toolbox/bgcolor": {
+    "light": "rgb(234, 234, 237)",
+    "dark": "{Colors$color/gray/90}",
+    "forcedColors": "transparent"
+  },
+  "toolbox/bgcolor/inactive": {
+    "light": "{Theme$toolbox/bgcolor}",
+    "dark": "{Theme$toolbox/bgcolor}",
+    "forcedColors": "{Theme$toolbox/bgcolor}"
+  },
+  "toolbox/textcolor": {
+    "light": "{Colors$color/gray/100}",
+    "dark": "{Colors$color/gray/05}",
+    "forcedColors": "transparent"
+  },
+  "toolbox/textcolor/inactive": {
+    "light": "{Theme$toolbox/textcolor}",
+    "dark": "{Theme$toolbox/textcolor}",
+    "forcedColors": "{Theme$toolbox/textcolor}"
+  },
   "badge/text/color": {
     "light": "{Theme$text/color/deemphasized}",
     "dark": "{Theme$text/color/deemphasized}",
@@ -644,6 +769,26 @@
     "dark": "rgba(21, 20, 26, 0.4)",
     "forcedColors": "{HCM Theme$CanvasText}"
   },
+  "breadcrumb/link/color": {
+    "light": "{Theme$link/color}",
+    "dark": "{Theme$link/color}",
+    "forcedColors": "{Theme$link/color}"
+  },
+  "breadcrumb/link/color/hover": {
+    "light": "{Theme$link/color/hover}",
+    "dark": "{Theme$link/color/hover}",
+    "forcedColors": "{Theme$link/color/hover}"
+  },
+  "breadcrumb/link/color/active": {
+    "light": "{Theme$link/color/active}",
+    "dark": "{Theme$link/color/active}",
+    "forcedColors": "{Theme$link/color/active}"
+  },
+  "breadcrumb/link/color/visited": {
+    "light": "{Theme$link/color/visited}",
+    "dark": "{Theme$link/color/visited}",
+    "forcedColors": "{Theme$link/color/visited}"
+  },
   "message-bar/background/color": {
     "light": "{Theme$background/color/information}",
     "dark": "{Theme$background/color/information}",
@@ -663,6 +808,51 @@
     "light": "{Theme$text/color}",
     "dark": "{Theme$text/color}",
     "forcedColors": "{Theme$text/color}"
+  },
+  "promo/background/color": {
+    "light": "color-mix(in lch, currentColor 8%, transparent)",
+    "dark": "color-mix(in lch, currentColor 8%, transparent)",
+    "forcedColors": "{Theme$background/color/canvas}"
+  },
+  "promo/background/color/vibrant": {
+    "light": "{Colors$color/violet/0}",
+    "dark": "{Colors$color/violet/90}",
+    "forcedColors": "transparent"
+  },
+  "promo/border": {
+    "light": "{Primitives$promo/border/width} solid {Theme$promo/border/color}",
+    "dark": "{Primitives$promo/border/width} solid {Theme$promo/border/color}",
+    "forcedColors": "{Primitives$promo/border/width} solid {Theme$promo/border/color}"
+  },
+  "promo/border/color": {
+    "light": "color-mix(in lch, currentColor 8%, transparent)",
+    "dark": "color-mix(in lch, currentColor 8%, transparent)",
+    "forcedColors": "{Theme$border/color}"
+  },
+  "promo/heading/text/color": {
+    "light": "{Theme$promo/message/text/color}",
+    "dark": "{Theme$promo/message/text/color}",
+    "forcedColors": "{Theme$promo/message/text/color}"
+  },
+  "promo/heading/text/color/vibrant": {
+    "light": "{Theme$promo/message/text/color}",
+    "dark": "{Theme$promo/message/text/color}",
+    "forcedColors": "{Theme$promo/message/text/color}"
+  },
+  "promo/message/text/color": {
+    "light": "{Theme$text/color}",
+    "dark": "{Theme$text/color}",
+    "forcedColors": "{Theme$text/color}"
+  },
+  "promo/message/text/color/vibrant": {
+    "light": "{Colors$color/violet/80}",
+    "dark": "{Colors$color/violet/0}",
+    "forcedColors": "transparent"
+  },
+  "reorderable-list/indicator/background/color": {
+    "light": "{Theme$color/accent/primary}",
+    "dark": "{Theme$color/accent/primary}",
+    "forcedColors": "{Theme$color/accent/primary}"
   },
   "toggle/background/color": {
     "light": "{Theme$button/background/color}",
@@ -728,6 +918,71 @@
     "light": "{Theme$background/color/canvas}",
     "dark": "{Theme$background/color/canvas}",
     "forcedColors": "{Theme$button/background/color}"
+  },
+  "visual-picker-item/border/color": {
+    "light": "{Theme$border/color/interactive}",
+    "dark": "{Theme$border/color/interactive}",
+    "forcedColors": "{Theme$border/color/interactive}"
+  },
+  "box/border": {
+    "light": "{Primitives$box/border/width} solid {Theme$box/border/color}",
+    "dark": "{Primitives$box/border/width} solid {Theme$box/border/color}",
+    "forcedColors": "{Primitives$box/border/width} solid {Theme$box/border/color}"
+  },
+  "box/border/color": {
+    "light": "{Theme$border/color}",
+    "dark": "{Theme$border/color}",
+    "forcedColors": "{Theme$border/color}"
+  },
+  "box/button/background/color": {
+    "light": "{Theme$button/background/color/menu}",
+    "dark": "{Theme$button/background/color/menu}",
+    "forcedColors": "{Theme$button/background/color/menu}"
+  },
+  "box/button/background/color/hover": {
+    "light": "{Theme$button/background/color/menu/hover}",
+    "dark": "{Theme$button/background/color/menu/hover}",
+    "forcedColors": "{Theme$button/background/color/menu/hover}"
+  },
+  "box/button/background/color/active": {
+    "light": "{Theme$button/background/color/menu/active}",
+    "dark": "{Theme$button/background/color/menu/active}",
+    "forcedColors": "{Theme$button/background/color/menu/active}"
+  },
+  "box/button/background/color/disabled": {
+    "light": "{Theme$button/background/color/menu/disabled}",
+    "dark": "{Theme$button/background/color/menu/disabled}",
+    "forcedColors": "{Theme$button/background/color/menu/disabled}"
+  },
+  "box/button/text/color": {
+    "light": "{Theme$button/text/color/menu}",
+    "dark": "{Theme$button/text/color/menu}",
+    "forcedColors": "{Theme$button/text/color/menu}"
+  },
+  "box/button/text/color/hover": {
+    "light": "{Theme$button/text/color/menu/hover}",
+    "dark": "{Theme$button/text/color/menu/hover}",
+    "forcedColors": "{Theme$button/text/color/menu/hover}"
+  },
+  "box/button/text/color/active": {
+    "light": "{Theme$button/text/color/menu/active}",
+    "dark": "{Theme$button/text/color/menu/active}",
+    "forcedColors": "{Theme$button/text/color/menu/active}"
+  },
+  "box/button/text/color/disabled": {
+    "light": "{Theme$button/text/color/menu/disabled}",
+    "dark": "{Theme$button/text/color/menu/disabled}",
+    "forcedColors": "{Theme$button/text/color/menu/disabled}"
+  },
+  "box/icon/fill": {
+    "light": "{Theme$icon/color}",
+    "dark": "{Theme$icon/color}",
+    "forcedColors": "{Theme$icon/color}"
+  },
+  "box/icon/stroke": {
+    "light": "{Theme$box/icon/fill}",
+    "dark": "{Theme$box/icon/fill}",
+    "forcedColors": "{Theme$box/icon/fill}"
   },
   "tab/attention/dot/color": {
     "light": "{Theme$color/accent/attention}",

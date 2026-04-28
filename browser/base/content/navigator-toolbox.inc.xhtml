@@ -180,8 +180,25 @@
                    overflows="false"/>
       <toolbaritem id="urlbar-container"
                    class="urlbar-container"
+                   context="urlbarView-context-menu"
                    removable="false"
                    overflows="false">
+        <menupopup id="urlbarView-context-menu">
+          <menuitem id="urlbar-view-context-menu-open-in-tab"
+                    data-l10n-id="urlbar-view-context-menu-open-in-tab"/>
+          <menu id="urlbarView-context-menu-open-in-container-tab"
+                data-l10n-id="urlbar-view-context-menu-open-in-container-tab"
+                selection-type="single"
+                node-type="link"
+                hide-if-private-browsing="true"
+                hide-if-usercontext-disabled="true">
+            <menupopup id="urlbarView-context-menu-open-in-container-tab-popup"/>
+          </menu>
+          <menuitem id="urlbarView-context-menu-open-in-window"
+                    data-l10n-id="urlbar-view-context-menu-open-in-window"/>
+          <menuitem id="urlbarView-context-menu-open-in-private-window"
+                    data-l10n-id="urlbar-view-context-menu-open-in-private-window"/>
+        </menupopup>
         <toolbartabstop/>
         <html:moz-urlbar id="urlbar"
               class="urlbar"
@@ -583,7 +600,7 @@
           <menupopup id="PlacesChevronPopup"
                       is="places-popup"
                       placespopup="true"
-                      native="false"
+                      nonnative=""
                       class="toolbar-menupopup"
                       tooltip="bhTooltip" popupsinherittooltip="true"
                       context="placesContext"/>
@@ -624,7 +641,7 @@
                  is="places-popup-arrow"
                  class="toolbar-menupopup animatable-menupopup"
                  placespopup="true"
-                 native="false"
+                 nonnative=""
                  context="placesContext"
                  openInTabs="children"
                  side="top"
@@ -648,7 +665,7 @@
           <menupopup id="BMB_bookmarksToolbarPopup"
                      is="places-popup"
                      placespopup="true"
-                     native="false"
+                     nonnative=""
                      context="placesContext">
             <menuitem id="BMB_viewBookmarksToolbar"
                       data-l10n-id="bookmarks-tools-toolbar-visibility-menuitem"
@@ -664,7 +681,7 @@
           <menupopup id="BMB_unsortedBookmarksPopup"
                      is="places-popup"
                      placespopup="true"
-                     native="false"
+                     nonnative=""
                      context="placesContext"/>
         </menu>
         <menu id="BMB_mobileBookmarks"
@@ -675,7 +692,7 @@
           <menupopup id="BMB_mobileBookmarksPopup"
                      is="places-popup"
                      placespopup="true"
-                     native="false"
+                     nonnative=""
                      context="placesContext"/>
         </menu>
 

@@ -66,9 +66,6 @@ class ScriptHashKey : public PLDHashEntryHdr {
 
   ScriptHashKey(ScriptLoader* aLoader,
                 const JS::loader::ScriptLoadRequest* aRequest,
-                const JS::loader::LoadedScript* aLoadedScript);
-  ScriptHashKey(ScriptLoader* aLoader,
-                const JS::loader::ScriptLoadRequest* aRequest,
                 mozilla::dom::ReferrerPolicy aReferrerPolicy,
                 const JS::loader::ScriptFetchOptions* aFetchOptions,
                 const nsCOMPtr<nsIURI> aURI);
@@ -277,6 +274,8 @@ class SharedScriptCache final
   ~SharedScriptCache();
 
   bool ShouldIgnoreMemoryPressure() override;
+
+  void ClearInProcessForMemoryPressure() override;
 
  private:
   bool EnsureEverHitMap();

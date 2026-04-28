@@ -394,6 +394,12 @@ DistributionCustomizer.prototype = {
       return this._checkCustomizationComplete();
     }
 
+    if (distroID == "MozillaOnline") {
+      Glean.distribution.mozillaonlineIgnored.set(true);
+      this.__defineGetter__("_ini", () => null);
+      return this._checkCustomizationComplete();
+    }
+
     let defaults = Services.prefs.getDefaultBranch(null);
 
     // Global really contains info we set as prefs.  They're only
@@ -490,22 +496,6 @@ DistributionCustomizer.prototype = {
         }
       } catch (e) {
         /* ignore bad prefs and move on */
-      }
-    }
-
-    if (this._ini.getString("Global", "id") == "yandex") {
-      // All yandex distributions have the same distribution ID,
-      // so we're using an internal preference to name them correctly.
-      // This is needed for search to work properly.
-      try {
-        defaults.setStringPref(
-          "distribution.id",
-          defaults
-            .get("extensions.yasearch@yandex.ru.clids.vendor")
-            .replace("firefox", "yandex")
-        );
-      } catch (e) {
-        // Just use the default distribution ID.
       }
     }
 

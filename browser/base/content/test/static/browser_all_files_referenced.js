@@ -52,9 +52,10 @@ var gExceptionPaths = [
 
   // toolkit/components/pdfjs/content/build/pdf.js
   "resource://pdf.js/web/images/",
-  // This file is only loaded in using a dynamic import in pdf.js in case wasm
-  // is not available.
+  // These files are only loaded in using a dynamic import in pdf.js in case
+  // wasm is not available.
   "resource://pdf.js/web/wasm/openjpeg_nowasm_fallback.js",
+  "resource://pdf.js/web/wasm/jbig2_nowasm_fallback.js",
 
   // Exclude the form autofill path that has been moved out of the extensions to
   // toolkit, see bug 1691821.
@@ -240,9 +241,6 @@ var allowlist = [
 
   // File from the ipp-activator add-on
   { file: "resource://builtin-addons/ipp-activator/breakages/tab.json" },
-
-  // Bug 2025853 - ContentSharingUtils is not yet imported anywhere.
-  { file: "resource://app/modules/contentsharing/ContentSharingUtils.sys.mjs" },
 
   // Starting from here, files in the allowlist are bugs that need fixing.
   // Bug 1339424 (wontfix?)

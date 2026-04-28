@@ -818,4 +818,28 @@ sealed class AppAction : Action {
      * @property count The new count of trackers blocked.
      */
     data class UpdateTrackersBlockedCount(val count: Int) : AppAction()
+
+    /**
+     * [AppAction]s related to the sports widget.
+     */
+    sealed class SportsWidgetAction : AppAction() {
+        /**
+         * Dispatched when countries were selected in the sports widget country selector.
+         *
+         * @property countryCodes Set of ISO codes of the selected countries.
+         */
+        data class CountriesSelected(val countryCodes: Set<String>) : SportsWidgetAction()
+
+        /**
+         * Dispatched when the user skips the "Follow your team" card.
+         */
+        data object FollowTeamSkipped : SportsWidgetAction()
+
+        /**
+         * Dispatched when the sports widget's visibility changes.
+         *
+         * @property isVisible The new visibility state of the sports widget.
+         */
+        data class VisibilityChanged(val isVisible: Boolean) : SportsWidgetAction()
+    }
 }

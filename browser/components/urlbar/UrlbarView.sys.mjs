@@ -110,6 +110,13 @@ export class UrlbarView {
         addDynamicStylesheet(this.window, viewTemplate.stylesheet);
       }
     }
+
+    let contextMenu = this.document.querySelector("#urlbarView-context-menu");
+    if (contextMenu) {
+      contextMenu.addEventListener("command", this);
+      contextMenu.addEventListener("popupshowing", this);
+      contextMenu.addEventListener("popuphiding", this);
+    }
   }
 
   get oneOffSearchButtons() {
@@ -2181,7 +2188,7 @@ export class UrlbarView {
         this.#createRowContentForBottomUrl(item, result);
       } else if (
         result.isRichSuggestion ||
-        lazy.UrlbarPrefs.get("nova.featureGate")
+        Services.prefs.getBoolPref("browser.nova.enabled", false)
       ) {
         this.#createRowContentForRichSuggestion(item, result);
       } else {
@@ -2474,7 +2481,10 @@ export class UrlbarView {
       };
     }
 
-    if (result.isRichSuggestion || lazy.UrlbarPrefs.get("nova.featureGate")) {
+    if (
+      result.isRichSuggestion ||
+      Services.prefs.getBoolPref("browser.nova.enabled", false)
+    ) {
       this.#updateRowForRichSuggestion(item, result);
     }
 
@@ -2688,7 +2698,7 @@ export class UrlbarView {
     // The "rich-suggestion" attribute isn't used in Nova.
     item.toggleAttribute(
       "rich-suggestion",
-      !lazy.UrlbarPrefs.get("nova.featureGate")
+      !Services.prefs.getBoolPref("browser.nova.enabled", false)
     );
 
     this.#setRowSelectable(
@@ -2754,7 +2764,7 @@ export class UrlbarView {
     // The "rich-suggestion" attribute isn't used in Nova.
     item.toggleAttribute(
       "rich-suggestion",
-      !lazy.UrlbarPrefs.get("nova.featureGate")
+      !Services.prefs.getBoolPref("browser.nova.enabled", false)
     );
 
     item.setAttribute(
@@ -4188,6 +4198,7 @@ export class UrlbarView {
   }
 
   on_command(event) {
+    let contextMenu;
     if (event.currentTarget == this.resultMenu) {
       let result = this.#resultMenuResult;
       this.#resultMenuResult = null;
@@ -4201,6 +4212,11 @@ export class UrlbarView {
           break;
       }
       this.input.pickResult(result, event, menuitem);
+    } else if (
+      (contextMenu = event.target.closest("#urlbarView-context-menu"))
+    ) {
+      let row = contextMenu.triggerNode.closest(".urlbarView-row");
+      this.input.pickResult(row.result, event, event.target);
     }
   }
 
@@ -4223,6 +4239,42 @@ export class UrlbarView {
       }
 
       this.#populateResultMenu({ commands });
+    } else if (event.target.id == "urlbarView-context-menu") {
+      if (!lazy.UrlbarPrefs.get("contextMenu.featureGate")) {
+        event.preventDefault();
+        return;
+      }
+
+      //  Don't show the context menu if the trigger is not on a result row.
+      let row = event.triggerEvent?.target.closest(".urlbarView-row");
+      if (!row) {
+        event.preventDefault();
+        return;
+      }
+
+      // Set the context-menu-trigger attribute on the row so it can be styled
+      // as if it were hovered while the context menu is open.
+      row.toggleAttribute("context-menu-trigger", true);
+
+      // Disable the context menu if the result does not return url.
+      let url = lazy.UrlbarUtils.getUrlFromResult(row.result, {
+        element: row,
+      })?.url;
+      event.target.toggleAttribute("disabled", !url);
+    } else if (
+      event.target.id == "urlbarView-context-menu-open-in-container-tab-popup"
+    ) {
+      event.target.ownerGlobal.createUserContextMenu(event, {
+        isContextMenu: true,
+      });
+    }
+  }
+
+  on_popuphiding(event) {
+    if (event.target.id == "urlbarView-context-menu") {
+      event.target.triggerNode
+        .closest(".urlbarView-row")
+        ?.toggleAttribute("context-menu-trigger", false);
     }
   }
 }

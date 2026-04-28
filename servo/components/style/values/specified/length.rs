@@ -368,6 +368,12 @@ impl FontRelativeLength {
             metrics.ic_width_or_default(reference_font_size.used_size())
         }
 
+        if context.in_container_query {
+            context
+                .builder
+                .add_flags(ComputedValueFlags::DEPENDS_ON_FONT_METRICS_IN_CONTAINER_QUERY);
+        }
+
         let reference_font_size = base_size.resolve(context);
         match *self {
             // Local font-relative units
@@ -1474,7 +1480,6 @@ impl Zero for NoCalcLength {
 ///
 /// <https://drafts.csswg.org/css-values/#lengths>
 #[derive(Clone, Debug, MallocSizeOf, PartialEq, SpecifiedValueInfo, ToCss, ToShmem, ToTyped)]
-#[typed_value(derive_fields)]
 pub enum Length {
     /// The internal length type that cannot parse `calc`
     NoCalc(NoCalcLength),
@@ -1781,7 +1786,6 @@ impl NonNegativeLength {
 /// https://drafts.csswg.org/css-values-4/#typedef-length-percentage
 #[allow(missing_docs)]
 #[derive(Clone, Debug, MallocSizeOf, PartialEq, SpecifiedValueInfo, ToCss, ToShmem, ToTyped)]
-#[typed_value(derive_fields)]
 pub enum LengthPercentage {
     Length(NoCalcLength),
     Percentage(computed::Percentage),

@@ -92,6 +92,7 @@ class Settings(
     private val appContext: Context,
     private val packageName: String = appContext.packageName,
     private val packageManagerCompatHelper: PackageManagerCompatHelper = appContext.packageManagerCompatHelper,
+    @Suppress("unused")
     private val isBenchmarkBuild: Boolean = BuildConfig.IS_BENCHMARK_BUILD,
 ) : PreferencesHolder {
     companion object {
@@ -458,6 +459,11 @@ class Settings(
     var isUserMetaAttributed by booleanPreference(
         appContext.getPreferenceKey(R.string.pref_key_is_user_meta_attributed),
         default = false,
+    )
+
+    var rtamoAddonDownloadUrl by stringPreference(
+        appContext.getPreferenceKey(R.string.pref_key_rtamo_addon_download_url),
+        default = "",
     )
 
     var contileContextId by stringPreference(
@@ -1139,6 +1145,11 @@ class Settings(
     var shouldUseTrackingProtection by booleanPreference(
         appContext.getPreferenceKey(R.string.pref_key_tracking_protection),
         default = true,
+    )
+
+    var shouldUseTrackingProtectionDatabase by booleanPreference(
+        appContext.getPreferenceKey(R.string.pref_key_tracking_protection_database_status),
+        default = false,
     )
 
     var shouldEnableGlobalPrivacyControl by booleanPreference(
@@ -2115,6 +2126,11 @@ class Settings(
         default = true,
     )
 
+    var isSwipeToolbarToShowTabsEnabled by booleanPreference(
+        appContext.getPreferenceKey(R.string.pref_key_swipe_toolbar_show_tabs),
+        default = true,
+    )
+
     /**
      * Address Sync feature.
      */
@@ -2325,14 +2341,6 @@ class Settings(
 
     val shouldUseComposableToolbar = true
 
-    /**
-     * Indicates if the homepage wallpaper background should be rendered in Compose.
-     */
-    var shouldUseComposeWallpaper by booleanPreference(
-        key = appContext.getPreferenceKey(R.string.pref_key_enable_compose_wallpaper),
-        default = false,
-    )
-
     var shouldUseMinimalBottomToolbarWhenEnteringText by booleanPreference(
         key = appContext.getPreferenceKey(R.string.pref_key_use_minimal_bottom_toolbar_while_entering_text),
         default = { FxNimbus.features.minimalAddressbar.value().atBottomWhileEnteringText },
@@ -2344,14 +2352,6 @@ class Settings(
     var toolbarRedesignEnabled by booleanPreference(
         appContext.getPreferenceKey(R.string.pref_key_enable_toolbar_redesign),
         default = { FxNimbus.features.toolbarRedesignOption.value().showOptions },
-    )
-
-    /**
-     * Indicates if the search bar CFR should be displayed to the user.
-     */
-    var shouldShowSearchBarCFR by booleanPreference(
-        key = appContext.getPreferenceKey(R.string.pref_key_should_searchbar_cfr),
-        default = false,
     )
 
     /**
@@ -2368,15 +2368,6 @@ class Settings(
     var shouldShowMenuCFR by booleanPreference(
         key = appContext.getPreferenceKey(R.string.pref_key_menu_cfr),
         default = false,
-    )
-
-    /**
-     * Indicates if the toolbar CFR was displayed to the user.
-     */
-    var hasSeenBrowserToolbarCFR by booleanPreference(
-        key = appContext.getPreferenceKey(R.string.pref_key_toolbar_cfr),
-        default = Config.channel.isReleaseOrBeta || isBenchmarkBuild,
-        persistDefaultIfNotExists = true,
     )
 
     /**
@@ -2558,6 +2549,33 @@ class Settings(
     var enableHomepageSportsWidget by booleanPreference(
         key = appContext.getPreferenceKey(R.string.pref_key_enable_homepage_sports_widget),
         default = { FxNimbus.features.homepageSportsWidget.value().enabled },
+    )
+
+    /**
+     * Indicates if the Homepage Sports Widget should be visible on the homepage.
+     * This is the user-controlled visibility toggle, independent of the
+     * [enableHomepageSportsWidget] feature flag.
+     */
+    var showHomepageSportsWidget by booleanPreference(
+        key = appContext.getPreferenceKey(R.string.pref_key_show_homepage_sports_widget),
+        default = true,
+    )
+
+    /**
+     * The set of ISO codes of the user's selected countries to follow for the sports widget.
+     */
+    var sportsSelectedCountries by stringSetPreference(
+        appContext.getPreferenceKey(R.string.pref_key_sports_selected_countries),
+        default = setOf(),
+    )
+
+    /**
+     * Whether the user has dismissed the sports widget "Follow your team" card via the
+     * "Skip" action. When true, the "Follow your team" card is not shown again.
+     */
+    var hasSkippedSportsFollowTeam by booleanPreference(
+        key = appContext.getPreferenceKey(R.string.pref_key_sports_has_skipped_follow_team),
+        default = false,
     )
 
     /**

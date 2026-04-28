@@ -44,6 +44,8 @@ run-if = [
 
 ["test_felt_browser_shutdown_crash_exit.py"]
 
+["test_felt_browser_close_warning.py"]
+
 ["test_felt_browser_signout.py"]
 
 ["test_felt_browser_signout_on_exit.py"]
@@ -69,6 +71,8 @@ run-if = [
 ["test_felt_device_posture.py"]
 
 ["test_felt_email_input_focus.py"]
+
+["test_felt_external_link.py"]
 
 ["test_felt_harness_prefs.py"]
 

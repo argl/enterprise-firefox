@@ -193,7 +193,7 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
         }
 
         requirePreference<Preference>(R.string.pref_key_search_optimization).apply {
-            isVisible = Config.channel.isDebug
+            isVisible = Config.channel.isNightlyOrDebug
         }
 
         requirePreference<SwitchPreferenceCompat>(
@@ -219,11 +219,6 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_should_show_custom_tab_extensions).apply {
             isVisible = Config.channel.isDebug
             isChecked = context.settings().shouldShowCustomTabExtensions
-            onPreferenceChangeListener = SharedPreferenceUpdater()
-        }
-
-        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_enable_compose_wallpaper).apply {
-            isChecked = context.settings().shouldUseComposeWallpaper
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
 
@@ -416,7 +411,7 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
         }
 
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_enable_ip_protection).apply {
-            isVisible = Config.channel.isDebug
+            isVisible = Config.channel.isNightlyOrDebug
             isChecked = context.settings().isIPProtectionEnabled
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
@@ -487,7 +482,7 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
         }
 
         requirePreference<SwitchPreferenceCompat>(R.string.pref_key_tab_groups_drag_and_drop).apply {
-            isVisible = Config.channel.isDebug
+            isVisible = Config.channel.isNightlyOrDebug
             isChecked = context.settings().tabGroupsDragAndDropEnabled
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
@@ -519,6 +514,12 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
             isChecked = context.settings().enableHomepageSportsWidget
             onPreferenceChangeListener = SharedPreferenceUpdater()
         }
+
+        requirePreference<SwitchPreferenceCompat>(R.string.pref_key_tracking_protection_database_status).apply {
+            isVisible = Config.channel.isDebug
+            isChecked = context.settings().shouldUseTrackingProtectionDatabase
+            onPreferenceChangeListener = SharedPreferenceUpdater()
+        }
     }
 
     override fun onDisplayPreferenceDialog(preference: Preference) {
@@ -548,9 +549,11 @@ class SecretSettingsFragment : PreferenceFragmentCompat(), SystemInsetsPaddedFra
             resources.getString(R.string.pref_key_remote_settings_server) -> {
                 SecretSettingsFragmentDirections.actionSecretSettingsFragmentToRemoteSettingsServerFragment()
             }
+
             resources.getString(R.string.pref_key_search_optimization) -> {
                 SecretSettingsFragmentDirections.actionSecretSettingsFragmentToSearchOptimizationFragment()
             }
+
             else -> return super.onPreferenceTreeClick(preference)
         }
         navigateFromSecretSettings(directions)

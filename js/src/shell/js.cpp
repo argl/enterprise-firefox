@@ -26,7 +26,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <chrono>
 #ifdef XP_WIN
 #  include <direct.h>
 #  include <process.h>
@@ -1744,12 +1743,14 @@ class MOZ_RAII AutoLockTelemetry : public LockGuard<Mutex> {
   AutoLockTelemetry() : Base(getMutex()) {}
 };
 
-using TelemetrySamples = mozilla::Vector<uint32_t, 0, js::SystemAllocPolicy>;
+using TelemetrySamples =
+    mozilla::Vector<JSTelemetryData, 0, js::SystemAllocPolicy>;
 constinit static mozilla::Array<UniquePtr<TelemetrySamples>,
                                 size_t(JSMetric::Count)>
     recordedTelemetrySamples;
 
-static void AccumulateTelemetryDataCallback(JSMetric id, uint32_t sample) {
+static void AccumulateTelemetryDataCallback(JSMetric id,
+                                            const JSTelemetryData& sample) {
   AutoLockTelemetry alt;
   TelemetrySamples* samples = recordedTelemetrySamples[size_t(id)].get();
   if (!samples) {
@@ -1866,8 +1867,16 @@ static bool GetTelemetrySamples(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  for (uint32_t sample : *samples) {
-    if (!NewbornArrayPush(cx, array, NumberValue(sample))) {
+  for (const JSTelemetryData& sample : *samples) {
+    Value value;
+    if (sample.is<bool>()) {
+      value = BooleanValue(sample.as<bool>());
+    } else if (sample.is<size_t>()) {
+      value = NumberValue(sample.as<size_t>());
+    } else {
+      value = NumberValue(sample.as<mozilla::TimeDuration>().ToMilliseconds());
+    }
+    if (!NewbornArrayPush(cx, array, value)) {
       return false;
     }
   }
@@ -3166,12 +3175,12 @@ static bool EvaluateInner(JSContext* cx, HandleString code,
     }
 
     if (saveBytecodeWithDelazifications) {
-      bool alreadyStarted;
-      if (!JS::StartCollectingDelazifications(cx, script, stencil,
-                                              alreadyStarted)) {
+      JS::CollectDelazificationsResult result;
+      if (!JS::StartCollectingDelazifications(cx, script, stencil, result)) {
         return false;
       }
-      MOZ_ASSERT(!alreadyStarted);
+      MOZ_ASSERT(result == JS::CollectDelazificationsResult::NewlyStarted ||
+                 result == JS::CollectDelazificationsResult::NotSupported);
     }
 
     if (execute) {
@@ -4108,7 +4117,8 @@ static bool DummyPreserveWrapperCallback(JSContext* cx, HandleObject obj) {
   return true;
 }
 
-static bool DummyHasReleasedWrapperCallback(HandleObject obj) { return true; }
+/* Wrappers stay preserved for dummy DOM objects. */
+static bool DummyHasReleasedWrapperCallback(HandleObject obj) { return false; }
 
 #ifdef FUZZING_JS_FUZZILLI
 static bool fuzzilli_hash(JSContext* cx, unsigned argc, Value* vp) {
@@ -9226,6 +9236,10 @@ static bool TransplantObject(JSContext* cx, unsigned argc, Value* vp) {
   RootedObject proto(cx);
   if (JS::GetClass(source) == GetDomClass()) {
     proto = GetDOMPrototype(cx, newGlobal);
+    if (proto == source) {
+      JS_ReportErrorASCII(cx, "Cannot transplant the FakeDOMObject prototype");
+      return false;
+    }
   } else {
     proto = JS::GetRealmObjectPrototype(cx);
   }
@@ -13019,8 +13033,6 @@ bool InitOptionParser(OptionParser& op) {
                           "Branch pruning (default: on, off to disable)") ||
       !op.addStringOption('\0', "ion-range-analysis", "on/off",
                           "Range analysis (default: on, off to disable)") ||
-      !op.addStringOption('\0', "ion-sink", "on/off",
-                          "Sink code motion (default: off, on to enable)") ||
       !op.addStringOption(
           '\0', "ion-instruction-reordering", "on/off",
           "Instruction reordering (default: off, on to enable)") ||
@@ -13343,6 +13355,8 @@ bool InitOptionParser(OptionParser& op) {
       !op.addBoolOption('\0', "enable-iterator-sequencing",
                         "Enable Iterator Sequencing") ||
       !op.addBoolOption('\0', "enable-error-iserror", "Enable Error.isError") ||
+      !op.addBoolOption('\0', "enable-error-stack-trace-limit",
+                        "Enable Error.stackTraceLimit") ||
       !op.addBoolOption('\0', "enable-iterator-range",
                         "Enable Iterator.range") ||
       !op.addBoolOption('\0', "enable-joint-iteration",
@@ -13362,6 +13376,8 @@ bool InitOptionParser(OptionParser& op) {
       !op.addBoolOption('\0', "enable-iterator-chunking",
                         "Enable Iterator Chunking") ||
       !op.addBoolOption('\0', "enable-iterator-join", "Enable Iterator.join") ||
+      !op.addBoolOption('\0', "enable-iterator-includes",
+                        "Enable Iterator.prototype.includes") ||
       !op.addBoolOption('\0', "enable-source-phase-imports",
                         "Enable source phase imports") ||
       !op.addBoolOption(
@@ -13461,6 +13477,12 @@ bool SetGlobalOptionsPreJSInit(const OptionParser& op) {
   }
   if (op.getBoolOption("enable-iterator-join")) {
     JS::Prefs::setAtStartup_experimental_iterator_join(true);
+  }
+  if (op.getBoolOption("enable-iterator-includes")) {
+    JS::Prefs::setAtStartup_experimental_iterator_includes(true);
+  }
+  if (op.getBoolOption("enable-error-stack-trace-limit")) {
+    JS::Prefs::setAtStartup_experimental_error_stack_trace_limit(true);
   }
 #endif
 #ifdef ENABLE_SOURCE_PHASE_IMPORTS
@@ -14011,16 +14033,6 @@ bool SetContextJITOptions(JSContext* cx, const OptionParser& op) {
       jit::JitOptions.disableRangeAnalysis = true;
     } else {
       return OptionFailure("ion-range-analysis", str);
-    }
-  }
-
-  if (const char* str = op.getStringOption("ion-sink")) {
-    if (strcmp(str, "on") == 0) {
-      jit::JitOptions.disableSink = false;
-    } else if (strcmp(str, "off") == 0) {
-      jit::JitOptions.disableSink = true;
-    } else {
-      return OptionFailure("ion-sink", str);
     }
   }
 

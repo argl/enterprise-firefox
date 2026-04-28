@@ -169,7 +169,7 @@ export class ContentSection extends React.PureComponent {
       mayHaveListsWidget,
       mayHaveWeatherForecast,
       openPreferences,
-      wallpapersEnabled,
+      wallpapersUserEnabled,
       activeWallpaper,
       setPref,
       mayHaveTopicSections,
@@ -180,6 +180,7 @@ export class ContentSection extends React.PureComponent {
       showSectionsMgmtPanel,
       // @nova-cleanup(remove-conditional): Remove novaEnabled
       novaEnabled,
+      wallpapersEnabled,
       toggleWidgetsManagementPanel,
       showWidgetsManagementPanel,
       widgetsEnabled,
@@ -207,28 +208,26 @@ export class ContentSection extends React.PureComponent {
     return (
       <>
         <div className="home-section">
-          {(wallpapersEnabled || novaEnabled) && (
+          {wallpapersEnabled && (
             <>
               <div className="wallpapers-section">
                 {novaEnabled && (
                   <moz-toggle
                     id="wallpapers-toggle"
-                    pressed={wallpapersEnabled || null}
+                    pressed={wallpapersUserEnabled || null}
                     ontoggle={this.onPreferenceSelect}
                     onToggle={this.onPreferenceSelect}
-                    data-preference="newtabWallpapers.enabled"
+                    data-preference="newtabWallpapers.user.enabled"
                     data-event-source="WALLPAPERS"
                     data-l10n-id="newtab-wallpaper-toggle-title"
                   />
                 )}
-                {wallpapersEnabled && (
-                  <WallpaperCategories
-                    setPref={setPref}
-                    activeWallpaper={activeWallpaper}
-                    exitEventFired={exitEventFired}
-                    onSubpanelToggle={onSubpanelToggle}
-                  />
-                )}
+                <WallpaperCategories
+                  setPref={setPref}
+                  activeWallpaper={activeWallpaper}
+                  exitEventFired={exitEventFired}
+                  onSubpanelToggle={onSubpanelToggle}
+                />
               </div>
             </>
           )}
@@ -290,20 +289,25 @@ export class ContentSection extends React.PureComponent {
           )}
           <div className="settings-toggles">
             {/* Note: If widgets are enabled, the weather toggle will be moved under Widgets subsection */}
-            {!mayHaveWidgets && mayHaveWeather && (
-              <div id="weather-section" className="section">
-                {/** @backward-compat { version 150 } React 16 (cached page) uses ontoggle; React 19 uses onToggle. Remove onToggle once Firefox 150 reaches Release. */}
-                <moz-toggle
-                  id="weather-toggle"
-                  pressed={weatherEnabled || null}
-                  ontoggle={this.onPreferenceSelect}
-                  onToggle={this.onPreferenceSelect}
-                  data-preference="showWeather"
-                  data-event-source="WEATHER"
-                  data-l10n-id="newtab-custom-weather-toggle"
-                />
-              </div>
-            )}
+            {
+              // @nova-cleanup(remove-conditional): Remove novaEnabled conditional on data-preference; replace with data-preference="widgets.weather.enabled"
+              !mayHaveWidgets && mayHaveWeather && (
+                <div id="weather-section" className="section">
+                  {/** @backward-compat { version 150 } React 16 (cached page) uses ontoggle; React 19 uses onToggle. Remove onToggle once Firefox 150 reaches Release. */}
+                  <moz-toggle
+                    id="weather-toggle"
+                    pressed={weatherEnabled || null}
+                    ontoggle={this.onPreferenceSelect}
+                    onToggle={this.onPreferenceSelect}
+                    data-preference={
+                      novaEnabled ? "widgets.weather.enabled" : "showWeather"
+                    }
+                    data-event-source="WEATHER"
+                    data-l10n-id="newtab-custom-weather-toggle"
+                  />
+                </div>
+              )
+            }
 
             <span className="divider" role="separator"></span>
 

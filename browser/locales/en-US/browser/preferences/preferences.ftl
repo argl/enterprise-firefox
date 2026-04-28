@@ -67,17 +67,20 @@ pane-search-title = Search
 category-search =
     .tooltiptext = { pane-search-title }
 
-pane-privacy-title = Privacy & Security
-category-privacy =
-    .tooltiptext = { pane-privacy-title }
+pane-privacy-title2 = Privacy and security
+pane-privacy-section =
+    .heading = Privacy and security
 
 pane-sync-title3 = Sync
 category-sync3 =
     .tooltiptext = { pane-sync-title3 }
 
-pane-ai-controls-title = AI Controls
+pane-ai-controls-title = AI controls
 category-ai-controls =
     .tooltiptext = { pane-ai-controls-title }
+
+pane-accessibility-title = Accessibility
+  .title = { pane-accessibility-title }
 
 settings-pane-labs-title = { -firefoxlabs-brand-name }
 settings-category-labs =
@@ -88,8 +91,8 @@ pane-experimental-reset =
   .label = Restore Defaults
   .accesskey = R
 
-help-button-label = { -brand-short-name } Support
-addons-button-label = Extensions & Themes
+help-button-label = { -brand-short-name } support
+addons-button-label = Extensions and themes
 
 focus-search =
     .key = f
@@ -386,21 +389,6 @@ preferences-colors-manage-button =
 
 preferences-fonts-header2 =
   .label = Fonts
-
-default-font-2 =
-  .label = Default font
-  .accesskey = D
-default-font-size-2 =
-  .label = Size
-  .accesskey = S
-
-advanced-fonts =
-    .label = Advanced…
-    .accesskey = A
-
-# Zoom is a noun, and the message is used as header for a group of options
-preferences-zoom-header2 =
-  .label = Zoom
 
 preferences-default-zoom-label =
     .label = Default zoom
@@ -709,19 +697,28 @@ play-drm-content =
 
 play-drm-content-learn-more = Learn more
 
-update-application-title = { -brand-short-name } Updates
+## Firefox updates
 
-update-application-description = Keep { -brand-short-name } up to date for the best performance, stability, and security.
+update-application-heading =
+    .label = { -brand-short-name } updates
+    .description = Updates improve { -brand-short-name }’s speed, stability, and security.
+
+update-application-suppress-prompts-heading =
+    .label = Notifications
+
+update-application-updates-managed-by-os =
+    .message = Updates are managed by your operating system
 
 # Variables:
 # $version (string) - Firefox version
 update-application-version = Version { $version } <a data-l10n-name="learn-more">What’s new</a>
 
-update-history =
-    .label = Show Update History…
+update-history-2 =
+    .label = Show update history
     .accesskey = p
 
-update-application-allow-description = Allow { -brand-short-name } to
+update-application-installation =
+    .label = Installation
 
 update-application-auto =
     .label = Automatically install updates (recommended)
@@ -735,7 +732,8 @@ update-application-background-enabled =
     .label = When { -brand-short-name } is not running
     .accesskey = W
 
-update-application-warning-cross-user-setting = This setting will apply to all Windows accounts and { -brand-short-name } profiles using this installation of { -brand-short-name }.
+update-application-warning-cross-user-setting-2 =
+    .message = This setting will apply to all Windows accounts and { -brand-short-name } profiles using this installation of { -brand-short-name }.
 
 update-application-suppress-prompts =
     .label = Show fewer update notification prompts
@@ -805,10 +803,6 @@ performance-default-content-process-count =
 
 browsing-group =
   .label = Browsing
-
-browsing-use-autoscroll =
-    .label = Use autoscrolling
-    .accesskey = a
 
 browsing-use-smooth-scrolling =
     .label = Use smooth scrolling
@@ -1228,6 +1222,8 @@ search-edit-engine =
     .accesskey = E
 
 search-find-more-link = Find more search engines
+
+search-filtering-for-add-engine = Add Engine
 
 # This warning is displayed when the chosen keyword is already in use
 # ('Duplicate' is an adjective)
@@ -2098,6 +2094,13 @@ collection-backlogged-crash-reports2 =
     .accesskey = c
 collection-backlogged-crash-reports-description = This helps { -vendor-short-name } diagnose and fix issues with the browser. Reports may include personal or sensitive data.
 
+# Promotional message displayed in the Settings panes to inform users of the new redesign
+settings-redesign-promo =
+    .heading = Same settings, new look!
+    .message = We reorganized this page so it’s easier to scan and explore. Your personal settings haven’t changed, and everything’s still here. Tip: use search to jump straight to what you need.
+settings-redesign-promo-dismiss-button =
+    .label = Got it
+
 privacy-segmentation-section-header = New features that enhance your browsing
 
 privacy-segmentation-section-description = When we offer features that use your data to give you a more personal experience:
@@ -2336,10 +2339,52 @@ preferences-doh-custom-provider-label =
 preferences-doh-header2 =
   .heading = DNS over HTTPS
 
+## Connection and software security section
+
+preferences-connection-header =
+    .heading = Connection and software security
+
+preferences-connection-link-section =
+    .label = Connection and software security
+    .description = See how connections stay secure, harmful software is blocked, and websites are verified.
+
+preferences-connection-link-button =
+    .label = Advanced settings
+
 ## The following strings are used in the Download section of settings
 
 desktop-folder-name = Desktop
 downloads-folder-name = Downloads
+
+## Accessibility page
+
+preferences-accessibility-header =
+    .heading = Accessibility
+
+preferences-default-zoom-select =
+    .aria-label = Default zoom
+
+preferences-fonts-family =
+    .label = Font family
+    .accesskey = D
+
+preferences-fonts-size =
+    .label = Font size
+    .accesskey = s
+
+preferences-fonts-advanced-settings =
+    .label = Advanced settings
+    .accesskey = A
+
+browsing-use-autoscroll =
+    .label = Use autoscrolling
+    .accesskey = a
+
+keyboard-and-scrolling-group =
+  .label = Keyboard navigation and scrolling
+
+motion-and-link-group =
+  .label = Motion and link styling
 
 ## AI controls page
 

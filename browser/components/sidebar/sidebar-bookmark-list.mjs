@@ -15,6 +15,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
 });
 
+const TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
+
 const DROP_BEFORE = -1;
 const DROP_ON = 0;
 const DROP_AFTER = 1;
@@ -134,6 +136,14 @@ export class SidebarBookmarkList extends SidebarTabList {
 
   handleFocusElementInRow(e) {
     if (
+      e.getModifierState("Accel") &&
+      e.key.toUpperCase() === this.selectAllShortcut
+    ) {
+      e.preventDefault();
+      this.selectAll();
+      return;
+    }
+    if (
       e.code !== "ArrowUp" &&
       e.code !== "ArrowDown" &&
       e.code !== "ArrowLeft" &&
@@ -148,6 +158,7 @@ export class SidebarBookmarkList extends SidebarTabList {
     e.preventDefault();
     const { target } = e;
     const isSummary = target.localName === "summary";
+    let nextFocusedRow = null;
     switch (e.code) {
       case "ArrowLeft":
         if (isSummary && target.parentElement?.open) {
@@ -197,6 +208,12 @@ export class SidebarBookmarkList extends SidebarTabList {
         const idx = items.indexOf(target);
         if (idx < items.length - 1) {
           items[idx + 1].focus();
+          if (
+            !isSummary &&
+            items[idx + 1].localName === "sidebar-bookmark-row"
+          ) {
+            nextFocusedRow = items[idx + 1];
+          }
         } else {
           this.#focusNextItemAfterFolder();
         }
@@ -207,10 +224,46 @@ export class SidebarBookmarkList extends SidebarTabList {
         const idx = items.indexOf(target);
         if (idx > 0) {
           this.#focusLastVisibleItem(items[idx - 1]);
+          if (
+            !isSummary &&
+            items[idx - 1].localName === "sidebar-bookmark-row"
+          ) {
+            nextFocusedRow = items[idx - 1];
+          }
         } else {
           this.#focusParentSummary();
         }
         break;
+      }
+    }
+    if (
+      (e.code === "ArrowDown" || e.code === "ArrowUp") &&
+      !e.getModifierState("Accel") &&
+      nextFocusedRow
+    ) {
+      if (e.shiftKey) {
+        this.dispatchEvent(
+          new CustomEvent("shift-select", {
+            bubbles: true,
+            composed: true,
+            detail: { row: nextFocusedRow },
+          })
+        );
+      } else {
+        this.clearSelection();
+        this.dispatchEvent(
+          new CustomEvent("clear-selection", {
+            bubbles: true,
+            composed: true,
+          })
+        );
+        this.dispatchEvent(
+          new CustomEvent("set-anchor", {
+            bubbles: true,
+            composed: true,
+            detail: { guid: nextFocusedRow.guid },
+          })
+        );
       }
     }
   }
@@ -514,16 +567,27 @@ export class SidebarBookmarkList extends SidebarTabList {
     }
     e.dataTransfer.clearData();
     e.dataTransfer.setData(lazy.PlacesUtils.TYPE_X_MOZ_PLACE, data);
+    if (item.url) {
+      e.dataTransfer.setData(
+        lazy.PlacesUtils.TYPE_X_MOZ_URL,
+        item.url + "\n" + item.title
+      );
+      e.dataTransfer.setData(lazy.PlacesUtils.TYPE_PLAINTEXT, item.url);
+    }
     e.dataTransfer.effectAllowed = "copyMove";
     e.stopPropagation();
   }
 
   #onDragOver(e) {
     e.stopPropagation();
-    if (!this.#getSupportedFlavor(e.dataTransfer)) {
+    const flavor = this.#getSupportedFlavor(e.dataTransfer);
+    if (!flavor) {
       return;
     }
-    const target = this.#findDropTarget(e.composedPath(), e.clientY);
+    let target = this.#findDropTarget(e.composedPath(), e.clientY);
+    if (!target) {
+      target = this.#getFolderDropTarget();
+    }
     if (!target || target.guid === this.#draggedGuid) {
       this.#cleanupIndicator();
       return;
@@ -538,7 +602,24 @@ export class SidebarBookmarkList extends SidebarTabList {
     }
     this.#showDropIndicator(target);
     this.#dropTarget = target;
-    e.dataTransfer.dropEffect = "move";
+    e.dataTransfer.dropEffect = lazy.PlacesUIUtils.PLACES_FLAVORS.includes(
+      flavor
+    )
+      ? "move"
+      : "copy";
+  }
+
+  #getFolderDropTarget() {
+    const parentDetails = this.closest("details");
+    if (parentDetails?.guid) {
+      return {
+        element: parentDetails,
+        guid: parentDetails.guid,
+        orientation: DROP_ON,
+        isFolder: true,
+      };
+    }
+    return null;
   }
 
   #onDragLeave(e) {
@@ -571,20 +652,63 @@ export class SidebarBookmarkList extends SidebarTabList {
     if (!flavor) {
       return;
     }
-    const data = e.dataTransfer.getData(flavor);
-    if (!data) {
-      return;
-    }
     let validNodes;
-    try {
-      ({ validNodes } = lazy.PlacesUtils.unwrapNodes(data, flavor));
-    } catch (ex) {
-      return;
+    if (flavor === TAB_DROP_TYPE) {
+      validNodes = this.#getNodesFromTabDrop(e.dataTransfer);
+    } else {
+      const data = e.dataTransfer.getData(flavor);
+      if (!data) {
+        return;
+      }
+      try {
+        ({ validNodes } = lazy.PlacesUtils.unwrapNodes(data, flavor));
+      } catch (ex) {
+        return;
+      }
     }
     if (!validNodes?.length) {
       return;
     }
-    this.#doInsert(validNodes, target, e.dataTransfer.dropEffect === "copy");
+    const doCopy =
+      !lazy.PlacesUIUtils.PLACES_FLAVORS.includes(flavor) ||
+      e.dataTransfer.dropEffect === "copy";
+    this.#doInsert(validNodes, target, doCopy);
+  }
+
+  #getNodesFromTabDrop(dataTransfer) {
+    const nodes = [];
+    const dropCount = dataTransfer.mozItemCount || 1;
+    for (let i = 0; i < dropCount; i++) {
+      const data = dataTransfer.mozGetDataAt(TAB_DROP_TYPE, i);
+      if (!data) {
+        continue;
+      }
+      if (
+        XULElement.isInstance(data) &&
+        data.localName === "tab" &&
+        data.ownerGlobal.isChromeWindow
+      ) {
+        const uri = data.linkedBrowser.currentURI;
+        nodes.push({
+          uri: uri?.spec ?? "about:blank",
+          title: data.label,
+          type: lazy.PlacesUtils.TYPE_X_MOZ_URL,
+        });
+      } else if (
+        XULElement.isInstance(data) &&
+        data.localName === "tab-split-view-wrapper" &&
+        data.ownerGlobal.isChromeWindow
+      ) {
+        for (const tab of data.tabs) {
+          nodes.push({
+            uri: tab.linkedBrowser.currentURI?.spec ?? "about:blank",
+            title: tab.label,
+            type: lazy.PlacesUtils.TYPE_X_MOZ_URL,
+          });
+        }
+      }
+    }
+    return nodes;
   }
 
   async #doInsert(validNodes, target, doCopy) {

@@ -140,7 +140,7 @@ const TOKEN_CATEGORIES = [
   },
   {
     name: "space",
-    alternateNames: ["padding", "margin", "inset"],
+    alternateNames: ["padding", "margin", "inset", "gap"],
     purposes: [PURPOSE.SEMANTIC, PURPOSE.STORYBOOK],
   },
   {
@@ -222,7 +222,8 @@ const getTokenSections = () => {
 
   return Object.fromEntries(
     Object.keys(allSections)
-      .sort()
+      // moz-box interferes with box-shadow tokens, so put "box" at the end of the list
+      .sort((a, b) => (a > b || a === "box" ? 1 : -1))
       .map(key => [key, allSections[key]])
   );
 };
@@ -288,6 +289,7 @@ const getLayerString = () => {
     "tokens-foundation",
     "tokens-prefers-contrast",
     "tokens-forced-colors",
+    "tokens-browser-theme",
   ];
 
   const layersWithOverrides = defaultLayers.flatMap(layer => [
@@ -336,6 +338,7 @@ const NEST_MEDIA_QUERIES_COMMENT = `/* Bug 1879900: Can't nest media queries ins
 
 const MEDIA_QUERY_PROPERTY_MAP = {
   "forced-colors": "forcedColors",
+  "browser-theme": "browserTheme",
   "prefers-contrast": "prefersContrast",
 };
 
@@ -387,6 +390,12 @@ const createDesktopFormat =
         surface,
         args,
         componentName,
+      }) +
+      formatTokens({
+        mediaQuery: "browser-theme",
+        surface,
+        args,
+        componentName,
       });
 
     OVERRIDE_IDENTIFIERS.forEach(({ name, pref }) => {
@@ -410,8 +419,14 @@ const createDesktopFormat =
           args,
           overrideIdentifier: name,
           componentName,
+        }) +
+        formatTokens({
+          mediaQuery: "browser-theme",
+          surface,
+          args,
+          overrideIdentifier: name,
+          componentName,
         });
-
       if (!overrideContents) {
         return;
       }
@@ -565,6 +580,16 @@ const shouldSkipToken = ({ overrideIdentifier, componentName, token }) => {
     return true;
   }
 
+  // moz-box greedily assumes box-shadow tokens belong to it.
+  if (componentName === "box" && token.name.startsWith("box-shadow")) {
+    return true;
+  }
+
+  // Allow box-shadow tokens to pass through, since they would fail a later check due to moz-box.
+  if (!componentName && token.name.startsWith("box-shadow")) {
+    return false;
+  }
+
   // Skip any tokens that don't belong to the component, if applicable.
   if (
     componentName &&
@@ -658,6 +683,19 @@ function formatTokens({
 
   let layer = `tokens-${mediaQuery ?? "foundation"}${overrideIdentifier ? `-${overrideIdentifier}` : ""}`;
   // Weird spacing below is unfortunately necessary for formatting the built CSS.
+  if (mediaQuery === "browser-theme") {
+    return `
+${NEST_MEDIA_QUERIES_COMMENT}
+@layer ${layer} {
+  @media not ((forced-colors) or (-moz-native-theme)) {
+    :root:not([lwtheme]),
+    :host(.anonymous-content-host) {
+${formattedVars}
+    }
+  }
+}
+`;
+  }
   if (mediaQuery) {
     return `
 ${NEST_MEDIA_QUERIES_COMMENT}
@@ -691,12 +729,24 @@ ${formattedVars}
  * @returns {string} The original token value based on our parameters.
  */
 function getOriginalTokenValue(token, prop, surface) {
+  const { value } = token.original;
   if (surface) {
-    return token.original.value[surface]?.[prop];
-  } else if (prop == "default" && typeof token.original.value != "object") {
-    return token.original.value;
+    return value[surface]?.[prop];
   }
-  return token.original.value?.[prop];
+  // Non-object default values apply to the foundation layer.
+  if (typeof value !== "object") {
+    return prop === "default" ? value : undefined;
+  }
+  // Tokens that define a nativeTheme override use it as the foundation value.
+  if (prop === "default") {
+    return value.nativeTheme ?? value.default;
+  }
+  // Only tokens with a nativeTheme override need a browser-theme value.
+  // Tokens without one use the default value in the foundation layer.
+  if (prop === "browserTheme") {
+    return value.nativeTheme ? value.default : undefined;
+  }
+  return value[prop];
 }
 
 /**

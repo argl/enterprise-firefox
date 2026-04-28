@@ -45,6 +45,7 @@ struct PageUseCounters;
 class WindowSessionStoreState;
 struct WindowSessionStoreUpdate;
 class SSCacheQueryResult;
+enum class FullscreenKeyboardLock : uint8_t;
 
 /**
  * A handle in the parent process to a specific nsGlobalWindowInner object.
@@ -299,7 +300,8 @@ class WindowGlobalParent final : public WindowContext,
 
   void DrawSnapshotInternal(gfx::CrossProcessPaint* aPaint,
                             const Maybe<IntRect>& aRect, float aScale,
-                            nscolor aBackgroundColor, uint32_t aFlags);
+                            nscolor aBackgroundColor,
+                            gfx::CrossProcessPaintFlags aFlags);
 
   // WebShare API - try to share
   mozilla::ipc::IPCResult RecvShare(IPCWebShareData&& aData,
@@ -323,9 +325,6 @@ class WindowGlobalParent final : public WindowContext,
   // creates the first active peer connection (aIsAdded = true) or closes the
   // last active peer connection (aIsAdded = false).
   mozilla::ipc::IPCResult RecvUpdateActivePeerConnectionStatus(bool aIsAdded);
-
-  mozilla::ipc::IPCResult RecvUpdateFullscreenKeyboardLockStatus(
-      bool aIsEnabled);
 
  public:
   mozilla::ipc::IPCResult RecvSetSingleChannelId(
@@ -363,6 +362,8 @@ class WindowGlobalParent final : public WindowContext,
 
   already_AddRefed<dom::PDigitalCredentialParent>
   AllocPDigitalCredentialParent();
+
+  void UpdateFullscreenKeyboardLockStatus(FullscreenKeyboardLock aStatus);
 
  private:
   WindowGlobalParent(CanonicalBrowsingContext* aBrowsingContext,

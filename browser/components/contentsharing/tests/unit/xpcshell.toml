@@ -9,5 +9,9 @@ prefs = [
   "browser.contentsharing.enabled=true",
 ]
 
+["test_cookies.js"]
+
+["test_makeValid.js"]
+
 ["test_schema.js"]
 support-files = ["invalidContentSharing.0.1.0.json", "validContentSharing.0.1.0.json"]

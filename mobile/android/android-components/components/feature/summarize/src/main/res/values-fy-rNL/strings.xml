@@ -58,7 +58,7 @@
   <!-- Error code shown on long press of the error icon. %1$d is an error code. -->
   <string name="mozac_summarize_info_error_code">Flaterkoade: %1$d</string>
   <!-- Loading text displayed while a page summary is being generated -->
-  <string name="mozac_feature_summarize_loading_title" translatable="false">Gearfetsje…</string>
+  <string name="mozac_feature_summarize_loading_title">Gearfetsje…</string>
   <!-- Content description for the settings icon button in the summarized view -->
   <string name="mozac_summarize_settings_button_content_description">Ynstellingen foar sidegearfetting</string>
   <!-- Title for the settings screen shown in the summarization bottom sheet -->
@@ -83,4 +83,6 @@
   <string name="mozac_ai_controls_page_summary_title">Sidegearfettingen</string>
   <!-- Description for the page summary AI controllable feature -->
   <string name="mozac_ai_controls_page_summary_description">Siden en gearfettingen wurde nea bewarre.</string>
+  <!-- Button text for the Error dismiss button on Shake to Summarize -->
+  <string name="mozac_summarize_error_dissmiss">Slute</string>
 </resources>

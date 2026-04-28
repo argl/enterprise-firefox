@@ -82,6 +82,7 @@ import mozilla.components.support.ktx.util.URLStringUtils
 import mozilla.components.support.test.middleware.CaptureActionsMiddleware
 import mozilla.components.support.test.robolectric.testContext
 import mozilla.components.support.utils.ClipboardHandler
+import mozilla.components.support.utils.INTENT_TYPE_PDF
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -155,6 +156,8 @@ import org.mozilla.fenix.settings.ShortcutType
 import org.mozilla.fenix.tabstray.redux.state.Page
 import org.mozilla.fenix.tabstray.ui.AccessPoint
 import org.mozilla.fenix.utils.Settings
+import org.mozilla.fenix.utils.Stories.markAsOpenedFromHomeScreen
+import org.mozilla.fenix.utils.Stories.markAsOpenedFromStoriesScreen
 import org.robolectric.annotation.Config
 import mozilla.components.browser.toolbar.R as toolbarR
 import mozilla.components.ui.icons.R as iconsR
@@ -1312,7 +1315,52 @@ class BrowserToolbarMiddlewareTest {
         testDispatcher.scheduler.advanceUntilIdle()
         captureMiddleware.assertLastAction(ShareResourceAction.AddShareAction::class) {
             assertEquals(currentTab.id, it.tabId)
-            assertEquals(ShareResourceState.LocalResource(currentTab.content.url), it.resource)
+            assertEquals(ShareResourceState.LocalResource(currentTab.content.url, INTENT_TYPE_PDF), it.resource)
+        }
+    }
+
+    @Test
+    fun `GIVEN the current tab shows a remote PDF WHEN the share shortcut is clicked THEN record telemetry and start sharing the remote resource`() {
+        settings.isTabStripEnabled = true
+        settings.shouldUseExpandedToolbar = false
+        settings.shouldShowToolbarCustomization = true
+        settings.toolbarSimpleShortcutKey = ShortcutType.SHARE.value
+        val browserScreenStore = buildBrowserScreenStore()
+        val captureMiddleware = CaptureActionsMiddleware<BrowserState, BrowserAction>()
+        val currentTab = createTab("https://mozilla.org/document.pdf", private = false).let {
+            it.copy(content = it.content.copy(isPdf = true))
+        }
+        val browserStore = BrowserStore(
+            initialState = BrowserState(
+                tabs = listOf(currentTab),
+                selectedTabId = currentTab.id,
+            ),
+            middleware = listOf(captureMiddleware),
+        )
+        val middleware = buildMiddleware(
+            browserScreenStore = browserScreenStore,
+            browserStore = browserStore,
+            isWideScreen = { true },
+        )
+        val toolbarStore = buildStore(middleware)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val shareButton = toolbarStore.state.displayState.browserActionsEnd[0] as ActionButtonRes
+        assertEquals(expectedShareButton(), shareButton)
+
+        toolbarStore.dispatch(shareButton.onClick as BrowserToolbarEvent)
+        testDispatcher.scheduler.advanceUntilIdle()
+        captureMiddleware.assertLastAction(ShareResourceAction.AddShareAction::class) {
+            assertEquals(currentTab.id, it.tabId)
+            assertEquals(
+                ShareResourceState.InternetResource(
+                    url = currentTab.content.url,
+                    contentType = INTENT_TYPE_PDF,
+                    private = false,
+                    referrerUrl = currentTab.content.url,
+                ),
+                it.resource,
+            )
         }
     }
 
@@ -1529,6 +1577,134 @@ class BrowserToolbarMiddlewareTest {
         verify {
             navController.navigate(
                 BrowserFragmentDirections.actionGlobalTabHistoryDialogFragment(null),
+                null,
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN a tab with a home screen story URL WHEN the back button is clicked THEN navigate to home`() = runTest(testDispatcher) {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        val currentTab = createTab(
+            url = "https://story.test".markAsOpenedFromHomeScreen(),
+            private = false,
+        )
+        val browserStore = BrowserStore(
+            initialState = BrowserState(
+                tabs = listOf(currentTab),
+                selectedTabId = currentTab.id,
+            ),
+        )
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+            isWideScreen = { true },
+        )
+        val toolbarStore = buildStore(middleware)
+
+        val backButton = toolbarStore.state.displayState.browserActionsStart[0] as ActionButtonRes
+        toolbarStore.dispatch(backButton.onClick as BrowserToolbarEvent)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify {
+            navController.navigate(
+                NavGraphDirections.actionGlobalHome(),
+                null,
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN a tab with a stories screen story URL WHEN the back button is clicked THEN navigate to stories fragment`() = runTest(testDispatcher) {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        val currentTab = createTab(
+            url = "https://story.test".markAsOpenedFromStoriesScreen(),
+            private = false,
+        )
+        val browserStore = BrowserStore(
+            initialState = BrowserState(
+                tabs = listOf(currentTab),
+                selectedTabId = currentTab.id,
+            ),
+        )
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+            isWideScreen = { true },
+        )
+        val toolbarStore = buildStore(middleware)
+
+        val backButton = toolbarStore.state.displayState.browserActionsStart[0] as ActionButtonRes
+        toolbarStore.dispatch(backButton.onClick as BrowserToolbarEvent)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify {
+            navController.navigate(
+                directionsEq(BrowserFragmentDirections.actionBrowserFragmentToStoriesFragment()),
+                null,
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN a tab with a home screen story URL WHEN the back button is clicked AND home is on the back stack THEN pop back to home`() = runTest(testDispatcher) {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        every { navController.popBackStack(R.id.homeFragment, false) } returns true
+        val currentTab = createTab(
+            url = "https://story.test".markAsOpenedFromHomeScreen(),
+            private = false,
+        )
+        val browserStore = BrowserStore(
+            initialState = BrowserState(
+                tabs = listOf(currentTab),
+                selectedTabId = currentTab.id,
+            ),
+        )
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+            isWideScreen = { true },
+        )
+        val toolbarStore = buildStore(middleware)
+
+        val backButton = toolbarStore.state.displayState.browserActionsStart[0] as ActionButtonRes
+        toolbarStore.dispatch(backButton.onClick as BrowserToolbarEvent)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify { navController.popBackStack(R.id.homeFragment, false) }
+        verify(exactly = 0) {
+            navController.navigate(
+                NavGraphDirections.actionGlobalHome(),
+                null,
+            )
+        }
+    }
+
+    @Test
+    fun `GIVEN a tab with a stories screen story URL WHEN the back button is clicked AND stories is on the back stack THEN pop back to stories`() = runTest(testDispatcher) {
+        every { navController.currentDestination?.id } returns R.id.browserFragment
+        every { navController.popBackStack(R.id.storiesFragment, false) } returns true
+        val currentTab = createTab(
+            url = "https://story.test".markAsOpenedFromStoriesScreen(),
+            private = false,
+        )
+        val browserStore = BrowserStore(
+            initialState = BrowserState(
+                tabs = listOf(currentTab),
+                selectedTabId = currentTab.id,
+            ),
+        )
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+            isWideScreen = { true },
+        )
+        val toolbarStore = buildStore(middleware)
+
+        val backButton = toolbarStore.state.displayState.browserActionsStart[0] as ActionButtonRes
+        toolbarStore.dispatch(backButton.onClick as BrowserToolbarEvent)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify { navController.popBackStack(R.id.storiesFragment, false) }
+        verify(exactly = 0) {
+            navController.navigate(
+                directionsEq(BrowserFragmentDirections.actionBrowserFragmentToStoriesFragment()),
                 null,
             )
         }
@@ -2115,6 +2291,23 @@ class BrowserToolbarMiddlewareTest {
         val result = middleware.buildAction(
             toolbarAction = ToolbarAction.Back,
         ) as ActionButtonRes
+
+        assertEquals(ActionButton.State.DEFAULT, result.state)
+    }
+
+    @Test
+    fun `GIVEN not other websitge in tab history current URL is of an internally opened story WHEN configuring the back action THEN enable it`() {
+        val currentTab = createTab("https://story.test".markAsOpenedFromHomeScreen())
+        val browserState = BrowserState(
+            tabs = listOf(currentTab),
+            selectedTabId = currentTab.id,
+        )
+        val browserStore = BrowserStore(browserState)
+        val middleware = buildMiddleware(
+            browserStore = browserStore,
+        )
+
+        val result = middleware.buildAction(toolbarAction = ToolbarAction.Back) as ActionButtonRes
 
         assertEquals(ActionButton.State.DEFAULT, result.state)
     }

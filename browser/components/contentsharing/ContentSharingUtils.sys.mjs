@@ -5,6 +5,10 @@
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
 const lazy = {};
+ChromeUtils.defineESModuleGetters(lazy, {
+  JsonSchema: "resource://gre/modules/JsonSchema.sys.mjs",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
+});
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "CONTENT_SHARING_ENABLED",
@@ -17,9 +21,8 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "browser.contentsharing.server.url",
   ""
 );
-ChromeUtils.defineESModuleGetters(lazy, {
-  JsonSchema: "resource://gre/modules/JsonSchema.sys.mjs",
-});
+
+const MAX_ITEM_COUNT = 30;
 
 const SCHEMA_MAP = new Map();
 async function loadContentSharingSchema() {
@@ -63,13 +66,267 @@ class ContentSharingUtilsClass {
     return this.#validator;
   }
 
+  /**
+   * Handles sharing bookmarks by building a share object and opening the
+   * content sharing modal. bookmarkFolderGuids can be 1 or more bookmark
+   * folder guids. If more than 1, the first guid will be treated as the parent
+   * folder and the rest will be nested inside it.
+   *
+   * @param {Array<string>} bookmarkFolderGuids An array of bookmark folder guids
+   * @param {Window} window The browser window to open the modal in
+   */
+  async createShareableLinkFromBookmarkFolders(bookmarkFolderGuids, window) {
+    let share;
+    try {
+      share = await this.buildShareFromBookmarkFolders(bookmarkFolderGuids);
+    } catch (e) {
+      console.error("ContentSharingUtils: failed to share bookmarks", e);
+    }
+    if (share) {
+      await this.#createLinkAndOpenModal(share, window, "bookmarks");
+    }
+  }
+
+  /**
+   * Shares the multi-selected tabs
+   *
+   * @param {MozTabbrowserTab[]} tabs
+   */
+  async handleShareTabs(tabs) {
+    if (!tabs.length) {
+      return;
+    }
+    const shareObject = {
+      type: "tabs",
+      title: `${tabs.length} tabs`,
+      children: tabs.map(t => ({
+        uri: t.linkedBrowser.currentURI.spec,
+        title: t.label,
+      })),
+    };
+    const share = this.buildShare(shareObject);
+    await this.#createLinkAndOpenModal(share, tabs[0].ownerGlobal, "tabs");
+  }
+
+  /**
+   * Handles sharing a tab group by building a share object and opening the
+   * content sharing modal.
+   *
+   * @param {MozTabbrowserTabGroup} tabGroup The tab group element to share
+   */
+  async handleShareTabGroup(tabGroup) {
+    let title = tabGroup.label;
+    if (!title) {
+      title = await tabGroup.ownerDocument.l10n.formatValue(
+        "tab-group-name-default"
+      );
+    }
+    const shareObject = {
+      title,
+      type: "tab_group",
+      children: tabGroup.tabs.map(t => {
+        return {
+          uri: t.linkedBrowser.currentURI.displaySpec,
+          title: t.label,
+        };
+      }),
+    };
+    const share = this.buildShare(shareObject);
+    await this.#createLinkAndOpenModal(
+      share,
+      tabGroup.ownerGlobal,
+      "tab group"
+    );
+  }
+
+  /**
+   * Builds a share object from bookmark folder guids. It first builds out the
+   * bookmark tree and then builds a share object from that tree, returning an
+   * object to be validated against contentsharing.schema.json and sent to the
+   * content sharing server. bookmarkFolderGuids must be 1 or more folder guids.
+   * If more than 1, the first guid will be treated as the parent folder and
+   * the rest will be nested inside it.
+   *
+   * @param {Array<string>} bookmarkFolderGuids An array of bookmark folder guids
+   * @returns {Promise<object>} The built share object that will be validated against
+   * the contentsharing.schema.json
+   */
+  async buildShareFromBookmarkFolders(bookmarkFolderGuids) {
+    if (!bookmarkFolderGuids.length) {
+      return null;
+    }
+
+    let bookmark;
+    if (bookmarkFolderGuids.length === 1) {
+      bookmark = await lazy.PlacesUtils.promiseBookmarksTree(
+        bookmarkFolderGuids[0]
+      );
+    } else {
+      // More than one folder selected: first folder is the parent, rest are children.
+      bookmark = await lazy.PlacesUtils.promiseBookmarksTree(
+        bookmarkFolderGuids[0]
+      );
+      bookmark.children = bookmark.children ?? [];
+
+      for (let guid of bookmarkFolderGuids.slice(1)) {
+        bookmark.children.push(
+          await lazy.PlacesUtils.promiseBookmarksTree(guid)
+        );
+      }
+    }
+
+    bookmark.type = "bookmarks";
+
+    return this.buildShare(bookmark);
+  }
+
+  /**
+   * Takes an object with a uri and optional title and returns an object with
+   * a url and title that is valid according the content sharing schema.
+   *
+   * @param {object} linkObject An object that must contain a uri and should
+   * contain a title.
+   * @returns {object|null} A link object with a url and a title. If the uri is
+   * missing or not valid, returns null. If the title is too long, it will be
+   * truncated to 100 characters.
+   */
+  makeValidLink(linkObject) {
+    if (!linkObject.uri) {
+      return null;
+    }
+
+    const httpsRegex = new RegExp("^https?://.*$");
+    if (!linkObject.uri.match(httpsRegex)) {
+      return null;
+    }
+
+    let url;
+    try {
+      url = new URL(linkObject.uri);
+    } catch (e) {
+      // This throws if the uri is not valid.
+      return null;
+    }
+
+    return {
+      url: url.toString().slice(0, 4000),
+      title: linkObject.title?.slice(0, 100) ?? "",
+    };
+  }
+
+  /**
+   * Builds a share object from a given bookmark tree/tab group/selected tabs.
+   * The share object is a simplified version of the bookmark tree that only
+   * includes the necessary information for sharing (e.g. title and url).
+   * For bookmarks, the share object will have a type of "bookmarks" and will
+   * include the title of the bookmark folder and an array of links, where each
+   * link can either be a bookmark (with a url and optional title) or a nested
+   * folder (with its own title and array of links). Nested folders will
+   * recursively call this function to build their share objects.
+   * For tab groups, the share object will have the type "tab_group" and will
+   * take the title of the tab group.
+   * For selected tabs, the share object will have the type "tabs" and the
+   * title will be the number of tabs selected.
+   * Both tab groups and selected tabs will include an array of links, where
+   * each link will have a url and title.
+   *
+   * @param {object} shareObject The bookmark tree to share.
+   * @param {object} currentCount The current count of links in the share
+   * object. The object only has a "value" property that is the count of the
+   * number of items in the share.
+   * @returns {object} The built share object that will be validated against
+   * the contentsharing.schema.json
+   */
+  buildShare(shareObject, currentCount = {}) {
+    // Using an object for currentCount so that it can be passed by reference
+    // and updated across recursive calls.
+    currentCount.value = currentCount.value ?? 0;
+
+    const share = {
+      type: shareObject.type ?? "bookmarks",
+      title: shareObject.title.slice(0, 100),
+    };
+    let links = [];
+    for (let linkOrNestShare of shareObject.children ?? []) {
+      if (currentCount.value >= MAX_ITEM_COUNT) {
+        break;
+      }
+
+      if (linkOrNestShare.uri) {
+        const validLink = this.makeValidLink(linkOrNestShare);
+        if (validLink) {
+          links.push(validLink);
+          currentCount.value += 1;
+        }
+      } else if (linkOrNestShare.children) {
+        linkOrNestShare.type = "bookmarks";
+
+        currentCount.value += 1;
+        links.push(this.buildShare(linkOrNestShare, currentCount));
+      }
+    }
+
+    share.links = links;
+
+    return share;
+  }
+
+  /**
+   * @param {object} share
+   * @param {Window} window
+   * @param {string} context Used in error logging (e.g. "tabs", "tab group")
+   */
+  async #createLinkAndOpenModal(share, window, context) {
+    let url;
+    try {
+      url = await this.createShareableLink(share);
+    } catch (e) {
+      console.error(`ContentSharingUtils: failed to share ${context}`, e);
+    }
+    await this.openShareModal(window, { share, url });
+  }
+
+  /**
+   * Opens the content sharing modal in the given window.
+   *
+   * @param {Window} window The browser window to open the modal in
+   * @param {object} args
+   * @param {object} args.share The share object to preview in the modal
+   * @param {string} [args.url] The shareable URL, if successfully created
+   */
+  async openShareModal(window, args) {
+    const url =
+      "chrome://browser/content/contentsharing/contentSharingModal.xhtml";
+    await window.gDialogBox?.open(url, args);
+  }
+
+  async createShareableLink(share) {
+    await this.validateSchema(share);
+
+    if (!this.serverURL) {
+      throw new Error("Content Sharing Server URL is not set");
+    }
+
+    let response = await fetch(this.serverURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(share),
+    });
+
+    let { url } = await response.json();
+
+    return url;
+  }
+
   countItems(share) {
     let count = 0;
     for (let item of share.links) {
       if (item.links) {
         count += this.countItems(item);
       }
-      // Alway count the current item
+      // Always count the current item
       count += 1;
     }
 
@@ -86,13 +343,44 @@ class ContentSharingUtilsClass {
       );
     }
 
-    if (this.countItems(share) > 100) {
+    if (this.countItems(share) > MAX_ITEM_COUNT) {
       throw new Error(
-        "ContentSharing Schema Error: Share object contains over 100 links"
+        `ContentSharing Schema Error: Share object contains over ${MAX_ITEM_COUNT} links`
       );
     }
 
     return true;
+  }
+
+  getCookie() {
+    let hostname;
+    try {
+      let serverURL = new URL(lazy.CONTENT_SHARING_SERVER_URL);
+
+      // Cookies are port-insensitive, but our test server sets a port number.
+      // Just use the hostname part of the URL for cookie lookup.
+      hostname = serverURL.hostname;
+    } catch (ex) {
+      console.error(
+        `Failed to get cookie because server URL in "browser.contentsharing.server.url" pref is unset or malformed: ` +
+          ex.message
+      );
+      return null;
+    }
+    const cookies = Services.cookies.getCookiesFromHost(hostname, {});
+    // Filter on host because parent domain cookies are returned when getting
+    // cookies from a subdomain.
+    let authCookie = cookies.find(
+      cookie =>
+        cookie.host == hostname &&
+        cookie.name == "auth" &&
+        cookie.expiry > Date.now()
+    );
+    return authCookie?.value;
+  }
+
+  isSignedIn() {
+    return !!this.getCookie();
   }
 }
 
