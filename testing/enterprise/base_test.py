@@ -12,6 +12,7 @@ import time
 from copy import deepcopy
 from enum import Enum
 
+from marionette_driver import errors
 from marionette_driver.marionette import Marionette
 from marionette_driver.wait import Wait
 from marionette_harness import MarionetteTestCase
@@ -302,3 +303,16 @@ enterprise.console.address=http://localhost:{self.console_port}
             result["_error"]
             == "Error: Felt authentication flow has completed, but no valid token is available."
         ), "Unexpected state after signout"
+
+    def assert_child_browser_closed(self):
+        self._logger.info("Verifying child browser is closed.")
+        try:
+            self._child_driver.get_url()
+            assert False, "Expected child browser to be closed"
+        except (
+            errors.InvalidSessionIdException,
+            errors.NoSuchWindowException,
+            errors.TimeoutException,
+            OSError,
+        ):
+            pass
