@@ -1064,7 +1064,16 @@ class RemotePoliciesProvider {
   }
 
   _performPolling() {
+    // Device posture is supplementary; if collecting it fails, fall back to a
+    // plain policy fetch rather than skipping the policy update entirely (this
+    // mirrors the guard in fetchPoliciesOnStartup()).
     lazy.ConsoleClient.collectDevicePosture({ waitForAddons: true })
+      .catch(error => {
+        console.warn(
+          `RemotePoliciesProvider performPolling() failed to collect device posture, fetching policies without it: ${error}`
+        );
+        return null;
+      })
       .then(posture => lazy.ConsoleClient.getRemotePolicies(posture))
       .then(jsonResponse => {
         this._hasRemoteConnection = true;
