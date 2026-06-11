@@ -1070,7 +1070,8 @@ class RemotePoliciesProvider {
     lazy.ConsoleClient.collectDevicePosture({ waitForAddons: true })
       .catch(error => {
         console.warn(
-          `RemotePoliciesProvider performPolling() failed to collect device posture, fetching policies without it: ${error}`
+          "RemotePoliciesProvider performPolling() failed to collect device posture, fetching policies without it:",
+          error
         );
         return null;
       })
@@ -1081,7 +1082,8 @@ class RemotePoliciesProvider {
       })
       .catch(error => {
         console.warn(
-          `RemotePoliciesProvider performPolling() with frequency ${this._pollingFrequency} caused error ${error}`
+          `RemotePoliciesProvider performPolling() with frequency ${this._pollingFrequency} caused error`,
+          error
         );
         this._hasRemoteConnection = false;
       });
@@ -1130,11 +1132,11 @@ class RemotePoliciesProvider {
       try {
         posture = await lazy.ConsoleClient.collectDevicePosture();
       } catch (e) {
-        console.error(`Failed to collect device posture on startup: ${e}`);
+        console.error("Failed to collect device posture on startup:", e);
       }
       res = await lazy.ConsoleClient.getRemotePolicies(posture);
     } catch (e) {
-      console.error(`Failed to fetch remote policies on startup: ${e}`);
+      console.error("Failed to fetch remote policies on startup:", e);
       this._failed = true;
       return;
     }
