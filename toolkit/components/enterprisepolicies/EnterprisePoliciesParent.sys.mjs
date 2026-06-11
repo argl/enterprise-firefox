@@ -964,6 +964,7 @@ class RemotePoliciesProvider {
     this._socket = null;
     this._hasRemoteConnection = false;
     this._poller = null;
+    this._pollInFlight = false;
     this._pollingFrequency = Services.prefs.getIntPref(
       this.POLLING_FREQUENCY_PREF,
       this.POLLING_FREQUENCY_FALLBACK
@@ -1064,6 +1065,13 @@ class RemotePoliciesProvider {
   }
 
   _performPolling() {
+    // Skip this tick if the previous poll is still running; the interval is
+    // server-controlled and posture collection can be slow.
+    if (this._pollInFlight) {
+      return;
+    }
+    this._pollInFlight = true;
+
     // Device posture is supplementary; if collecting it fails, fall back to a
     // plain policy fetch rather than skipping the policy update entirely (this
     // mirrors the guard in fetchPoliciesOnStartup()).
@@ -1086,6 +1094,9 @@ class RemotePoliciesProvider {
           error
         );
         this._hasRemoteConnection = false;
+      })
+      .finally(() => {
+        this._pollInFlight = false;
       });
   }
 
