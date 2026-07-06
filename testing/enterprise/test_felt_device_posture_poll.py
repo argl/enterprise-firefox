@@ -28,8 +28,7 @@ class FeltDevicePosturePoll(FeltTests):
         return r.json()
 
     def run_posture_updated_by_browser_poll(self):
-        # Regression: the initial FELT UI posture has extensions=null (JSON
-        # null -> Python None). Verify the extraction logic doesn't crash.
+        # Regression: verify null-extensions handling doesn't crash.
         null_posture = {"extensions": None}
         null_exts = null_posture.get("extensions") or []
         assert [e["id"] for e in null_exts] == [], (

@@ -27,24 +27,7 @@ ChromeUtils.defineLazyGetter(lazy, "log", () => {
 Services.obs.notifyObservers(window, "browser-delayed-startup-finished");
 
 async function connectToConsole(email) {
-  let posture;
-  try {
-    posture = await lazy.ConsoleClient.sendDevicePosture();
-  } catch (err) {
-    lazy.log.error(`Failed to send device posture: ${err}`);
-    await lazy.FeltErrorReport.handleXhrError(err);
-    return;
-  }
-
-  if (!posture) {
-    // TODO: Currently we don't check the posture yet. In the future we need to handle rejected device posture
-    return;
-  }
-
-  const ssoLoginURI = await lazy.ConsoleClient.constructSsoLoginURI(
-    email,
-    posture.posture
-  );
+  const ssoLoginURI = await lazy.ConsoleClient.constructSsoLoginURI(email);
 
   const browser = document.getElementById("browser");
   browser.setAttribute("maychangeremoteness", "true");

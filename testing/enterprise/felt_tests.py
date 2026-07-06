@@ -229,17 +229,7 @@ class ConsoleHttpHandler(LocalHttpRequestHandler):
 
         if path == "/sso/login":
             query = urllib.parse.parse_qs(parsed.query)
-            if (
-                not "devicePostureToken" in query.keys()
-                or not "deviceId" in query.keys()
-            ):
-                self.forbidden()
-                return
-
-            if query["devicePostureToken"][0] != self.server.device_posture_token:
-                print(
-                    f"Incorrect token. Expected '{self.server.device_posture_token}' received '{query['devicePostureToken'][0]}'"
-                )
+            if "deviceId" not in query.keys():
                 self.forbidden()
                 return
 
@@ -367,14 +357,6 @@ class ConsoleHttpHandler(LocalHttpRequestHandler):
             policy_access_token = self.server.policy_access_token.value
             policy_refresh_token = self.server.policy_refresh_token.value
 
-            """
-            TODO: Behavior is not yet clearly defined
-            with self.server.device_posture_reply_forbidden.get_lock():
-                if self.server.device_posture_reply_forbidden.value == 1:
-                    policy_access_token = ""
-                    policy_refresh_token = ""
-            """
-
             obj = json.dumps({
                 "access_token": f"{policy_access_token}",
                 "token_type": "bearer",
@@ -488,17 +470,6 @@ class ConsoleHttpHandler(LocalHttpRequestHandler):
                 "refresh_token": self.server.policy_refresh_token.value,
             })
 
-        elif path == "/sso/device_posture":
-            payload = json.loads(
-                self.rfile.read(int(self.headers.get("Content-Length")))
-            )
-            self.server.device_posture_payload = payload
-            if not hasattr(self.server, "device_posture_history"):
-                self.server.device_posture_history = []
-            self.server.device_posture_history.append(payload)
-            self.server.device_posture_token = str(uuid.uuid4())
-            m = json.dumps({"posture": self.server.device_posture_token})
-
         elif path == "/api/browser/policies":
             if not self.check_auth():
                 return
@@ -583,8 +554,6 @@ def serve(
     policy_access_connector=None,
     policies_fail_request=None,
     signout_count=None,
-    # TODO: Behavior is not yet clearly defined
-    # device_posture_reply_forbidden=None,
 ):
     httpd = ConsoleSSOHTTPServer(("", 0), classname)
     if is_console:
@@ -617,11 +586,6 @@ def serve(
     httpd.serve_updates = False
     httpd.serve_updates_version = ""
     httpd.serve_forced_updates_count = 0
-    """
-    TODO: Behavior is not yet clearly defined
-    if device_posture_reply_forbidden is not None:
-        httpd.device_posture_reply_forbidden = device_posture_reply_forbidden
-    """
     print(
         f"Serving localhost:{httpd.server_address[1]} SSO={httpd.sso_port} CONSOLE={httpd.console_port} with {classname}"
     )
@@ -722,10 +686,6 @@ class FeltTestsBase(ConsoleSSOPortMixin, EnterpriseTestsBase):
         self.policy_access_connector = Value("b", 0)
         self.policy_extensions = Value("B", 0)
         self.policies_fail_request = Value("B", 0)
-        """
-        TODO: Behavior is not yet clearly defined
-        self.device_posture_reply_forbidden = Value("B", 0)
-        """
 
         self.policy_access_token = SharedString("")
         self.policy_refresh_token = SharedString("")
@@ -746,8 +706,6 @@ class FeltTestsBase(ConsoleSSOPortMixin, EnterpriseTestsBase):
                 policy_refresh_token=self.policy_refresh_token,
                 policies_fail_request=self.policies_fail_request,
                 signout_count=self.signout_count,
-                # TODO: Behavior is not yet clearly defined
-                # device_posture_reply_forbidden=self.device_posture_reply_forbidden,
             ),
         )
         self.console_httpd.start()

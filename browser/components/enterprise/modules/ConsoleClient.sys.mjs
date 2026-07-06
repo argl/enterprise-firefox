@@ -147,7 +147,6 @@ export const ConsoleClient = {
       REMOTE_POLICIES: "/api/browser/policies",
       KEY: "/api/browser/key",
       TOKEN: "/sso/token",
-      DEVICE_POSTURE: "/sso/device_posture",
       WHOAMI: "/api/browser/whoami",
       FXACCOUNT: "/api/browser/account",
     };
@@ -169,16 +168,14 @@ export const ConsoleClient = {
    * Constructs the SSO login URL for the provided email.
    *
    * @param {string} email - Email address to prefill for SSO initiation.
-   * @param {string} devicePostureToken - Token received for device posture
    * @returns {nsIURI}
    */
-  async constructSsoLoginURI(email, devicePostureToken) {
+  async constructSsoLoginURI(email) {
     const deviceId = lazy.FeltStorage.getDeviceId();
     const url = await this.consoleBaseURI;
     url.pathname = this._paths.SSO;
     url.searchParams.set("target", "browser");
     url.searchParams.set("email", email);
-    url.searchParams.set("devicePostureToken", devicePostureToken);
     url.searchParams.set("deviceId", deviceId);
     // Consumer expects uri as nsIURI
     const uri = Services.io.newURI(url.href);
@@ -312,34 +309,6 @@ export const ConsoleClient = {
 
       xhr.send(body);
     });
-  },
-
-  /**
-   * Collect the device posture data and send them to the console.
-   *
-   * @param {object} root0
-   * @param {boolean} root0.waitForAddons
-   * @returns {Promise<{posture: string}>} Token reported by console.
-   */
-  async sendDevicePosture({ waitForAddons = false } = {}) {
-    const devicePosture = await this.collectDevicePosture({ waitForAddons });
-    const url = await this.constructURI(this._paths.DEVICE_POSTURE);
-
-    const res = await this._xhrFetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(devicePosture),
-    });
-
-    if (res.ok) {
-      return await res.json();
-    }
-
-    const text = await res.text().catch(() => "");
-    throw new Error(`Post failed (${res.status}): ${text}`);
   },
 
   /**

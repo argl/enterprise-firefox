@@ -111,16 +111,6 @@ class FeltDevicePosture(FeltTests):
                 self._logger.info(f"Console not yet online at {console_addr}: {ex}")
                 time.sleep(0.5)
 
-        """
-    def test_felt_1_perform_sso_auth(self):
-        TODO: Behavior is not yet clearly defined
-        self._logger.info("Setting forbidden device posture")
-        self.device_posture_reply_forbidden.value = 1
-        self._manually_closed_child = True
-        self._logger.info("Setting forbidden device posture done")
-        return super().test_felt_1_perform_sso_auth(exp)
-        """
-
     def run_device_posture_content(self):
         device_posture = self.get_device_posture()
         assert "name" in device_posture["os"], "Device posture reports OS name"
@@ -282,14 +272,14 @@ class FeltDevicePosture(FeltTests):
 
     def run_posture_history(self):
         console_addr = f"http://localhost:{self.console_port}"
-        # Wait until at least one posture has a non-null extensions field,
-        # meaning the browser poll sent it after AddonManager was ready.
+        # Wait until at least one posture with a non-null extensions field
+        # arrives from the browser policy poll.
         max_tries = 40
         for _ in range(max_tries):
             r = requests.get(f"{console_addr}/sso/get_device_posture_history")
             history = r.json()
             has_extensions = any(p["extensions"] is not None for p in history)
-            if len(history) >= 2 and has_extensions:
+            if len(history) >= 1 and has_extensions:
                 break
             time.sleep(0.5)
         else:
@@ -298,13 +288,6 @@ class FeltDevicePosture(FeltTests):
                 f"submissions all with null extensions"
             )
 
-        # The first posture comes from the FELT UI where AddonManager is
-        # unavailable, so extensions must be null (not yet known).
-        assert history[0]["extensions"] is None, (
-            "First posture (FELT UI) has null extensions"
-        )
-        # Once the browser poll fires (after AddonManager is ready),
-        # extensions must be a list.
         browser_posture = next(p for p in history if p["extensions"] is not None)
         assert isinstance(browser_posture["extensions"], list), (
             "Browser poll posture has extensions list"
